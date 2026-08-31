@@ -3,20 +3,20 @@
     width: 100%;
     margin-top: 14px;
     border-radius: 12px;
-    background: rgba(0, 0, 0, .16);
+    background: var(--queue-background, rgba(0, 0, 0, .16));
     overflow: hidden;
     table-layout:fixed;
     position: relative;
 }
 
 .orderTable thead th{
-    color: #9395b3;
-    font-size: 10px;
+    color: var(--queue-header-color, #9395b3);
+    font-size: calc(var(--queue-header-size, 10px) * var(--frame-scale, 1));
     font-weight: 700;
     letter-spacing: 1px;
     text-align: left;
     padding: 10px 9px 8px;
-    white-space: 1em;
+    white-space: nowrap;
 }
 
 .orderTable thead th:first-child { width: 44%; }
@@ -32,7 +32,7 @@
 /* 点歌项样式 */
 .orderTable tbody tr{
     width: 100%;
-    height: 40px;
+    height: max(36px, calc(40px * var(--frame-scale, 1)));
     display: flex;
     position: absolute;
     transition: .5s;
@@ -41,14 +41,18 @@
 .orderTable tbody td{
     flex: 1;
     min-width: 0;
-    padding: 10px 9px;
-    color: #e4e4ef;
-    font-size: 12px;
+    padding: calc(10px * var(--frame-scale, 1)) calc(9px * var(--frame-scale, 1));
+    color: var(--queue-text-color, #e4e4ef);
+    font-size: calc(var(--queue-text-size, 12px) * var(--frame-scale, 1));
     text-align: left;
-    /* 隐藏溢出文字 */
+    line-height: 1.25;
+    /* 缩放后允许最多两行，避免窄框体下整段文字直接消失 */
     overflow: hidden;
-    white-space:nowrap; 
+    white-space: normal;
     text-overflow:ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .orderTable tbody tr:nth-child(odd) { background: rgba(255, 255, 255, .035); }
@@ -124,5 +128,3 @@
         transform: scale(1);
     }
 }
-
-

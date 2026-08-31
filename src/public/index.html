@@ -7,20 +7,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Damuku_music</title>
     <!-- DEV/STA 产品版本与前端构建号由 config/version.js 生成到 version.js。 -->
-    <script src="./version.js?v=20260816-1"></script>
+    <script src="./version.js?v=20260831-1"></script>
     <!-- 库文件 -->
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/pako/2.0.3/pako.min.js"></script>
     <!-- 配置文件 -->
     <script src="./webapi.js"></script>
     <!-- main -->
-    <script type="module" src="./main.js?v=20260816-1"></script>
+    <script type="module" src="./main.js?v=20260831-7"></script>
     <!-- 总体样式文件 -->
-    <link rel="stylesheet" href="./styles/main-page.css?v=20260815-3">
+    <link rel="stylesheet" href="./styles/main-page.css?v=20260831-7">
     <!-- 点歌面板样式 -->
     <link rel="stylesheet" href="./styles/order-table.css?v=20260809-16">
     <!-- 设置面板样式 -->
-    <link rel="stylesheet" href="./styles/setting-page.css?v=20260812-24">
+    <link rel="stylesheet" href="./styles/setting-page.css?v=20260831-8">
     <style id="customOverlayStyle"></style>
 </head>
 
@@ -292,6 +292,9 @@
                     <!-- 显示设置 -->
                     <table class="setting_display_page">
                         <tbody>
+                            <tr class="displaySectionTitle">
+                                <td colspan="3">播放界面</td>
+                            </tr>
                             <tr>
                                 <td>内置主题</td>
                                 <td colspan="2">
@@ -308,8 +311,64 @@
                             </tr>
                             <tr>
                                 <td>背景模糊</td>
-                                <td><input id="overlayBlur" type="range" min="0" max="24" step="1"></td>
+                                <td><input id="overlayBlur" type="range" min="0" max="50" step="1"></td>
                                 <td><output id="overlayBlurValue"></output></td>
+                            </tr>
+                            <tr>
+                                <td>卡片背景颜色</td>
+                                <td><input id="overlayBackgroundColor" type="color" value="#1c1f33"></td>
+                                <td>播放卡片和队列</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="displaySectionTitle">歌曲与队列文字</td>
+                            </tr>
+                            <tr>
+                                <td>歌曲名称字号</td>
+                                <td><input id="playerTitleSize" type="number" min="12" max="48" step="1"></td>
+                                <td>像素</td>
+                            </tr>
+                            <tr>
+                                <td>歌曲名称颜色</td>
+                                <td><input id="playerTitleColor" type="color" value="#ffffff"></td>
+                                <td>当前播放歌曲</td>
+                            </tr>
+                            <tr>
+                                <td>歌手字号/颜色</td>
+                                <td>
+                                    <div class="settingControlGroup">
+                                        <input id="playerArtistSize" type="number" min="10" max="32" step="1">
+                                        <input id="playerArtistColor" type="color" value="#c6c7d9">
+                                    </div>
+                                </td>
+                                <td>像素</td>
+                            </tr>
+                            <tr>
+                                <td>队列文字字号</td>
+                                <td><input id="queueTextSize" type="number" min="10" max="32" step="1"></td>
+                                <td>像素</td>
+                            </tr>
+                            <tr>
+                                <td>队列文字颜色</td>
+                                <td><input id="queueTextColor" type="color" value="#e4e4ef"></td>
+                                <td>歌曲/歌手/点歌人</td>
+                            </tr>
+                            <tr>
+                                <td>队列表头字号/颜色</td>
+                                <td>
+                                    <input id="queueHeaderSize" type="number" min="9" max="24" step="1">
+                                    <input id="queueHeaderColor" type="color" value="#9395b3">
+                                </td>
+                                <td>像素</td>
+                            </tr>
+                            <tr>
+                                <td>颜色配置</td>
+                                <td colspan="2">
+                                    <button id="resetColorSettings" type="button">重置颜色配置</button>
+                                    <span class="setting_tip">恢复背景、歌曲、歌手、队列和歌词颜色默认值</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="displaySectionTitle">歌词显示</td>
                             </tr>
                             <tr>
                                 <td>显示歌词</td>
@@ -335,9 +394,52 @@
                                 <td>毫秒</td>
                             </tr>
                             <tr>
+                                <td colspan="3" class="displaySectionTitle">歌词排版与字体</td>
+                            </tr>
+                            <tr>
                                 <td>歌词专用页字号</td>
                                 <td><input id="lyricsFontSize" type="number" min="12" max="64" step="1"></td>
                                 <td>像素（仅影响 lyric=true 页面）</td>
+                            </tr>
+                            <tr>
+                                <td>英文字体</td>
+                                <td>
+                                    <div class="settingControlGroup fontControlGroup">
+                                        <select id="lyricsFontFamilyLatinSelect" aria-label="选择英文字体">
+                                            <option value="Inter">Inter</option>
+                                            <option value="Segoe UI">Segoe UI</option>
+                                            <option value="Arial">Arial</option>
+                                            <option value="sans-serif">sans-serif</option>
+                                        </select>
+                                        <input id="lyricsFontFamilyLatin" type="text" list="lyricsFontOptions" maxlength="120" autocomplete="off" value="Inter" placeholder="也可手动输入字体名">
+                                    </div>
+                                    <datalist id="lyricsFontOptions">
+                                        <option value="Inter"></option>
+                                        <option value="Segoe UI"></option>
+                                        <option value="Microsoft YaHei"></option>
+                                        <option value="Arial"></option>
+                                        <option value="sans-serif"></option>
+                                    </datalist>
+                                </td>
+                                <td rowspan="2">
+                                    <button id="loadSystemFonts" type="button">读取系统字体</button>
+                                    <span id="systemFontStatus" class="setting_tip" role="status"></span>
+                                    <span id="lyricsFontSwitchStatus" class="setting_tip" role="status" aria-live="polite"></span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>中文字体</td>
+                                <td>
+                                    <div class="settingControlGroup fontControlGroup">
+                                        <select id="lyricsFontFamilyCjkSelect" aria-label="选择中文字体">
+                                            <option value="Microsoft YaHei">Microsoft YaHei</option>
+                                            <option value="SimHei">SimHei</option>
+                                            <option value="Microsoft JhengHei">Microsoft JhengHei</option>
+                                            <option value="sans-serif">sans-serif</option>
+                                        </select>
+                                        <input id="lyricsFontFamilyCjk" type="text" list="lyricsFontOptions" maxlength="120" autocomplete="off" value="Microsoft YaHei" placeholder="也可手动输入字体名">
+                                    </div>
+                                </td>
                             </tr>
                             <tr>
                                 <td>歌词颜色</td>
@@ -348,6 +450,9 @@
                                 <td>歌词透明度</td>
                                 <td><input id="lyricsOpacity" type="range" min="10" max="100" step="1"></td>
                                 <td><output id="lyricsOpacityValue"></output></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="displaySectionTitle">歌词专用页布局</td>
                             </tr>
                             <tr>
                                 <td>歌词专用页行数</td>
@@ -365,6 +470,9 @@
                                 <td>歌词专用页宽度</td>
                                 <td><input id="lyricsOverlayWidth" type="range" min="50" max="100" step="1"></td>
                                 <td><output id="lyricsOverlayWidthValue"></output>（仅影响 lyric=true 页面）</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="displaySectionTitle">播放控制与场景</td>
                             </tr>
                             <tr>
                                 <td>允许拖动进度</td>
@@ -398,6 +506,9 @@
                                 <td>旧场景心跳超过此时间才允许自动判断</td>
                             </tr>
                             <tr>
+                                <td colspan="3" class="displaySectionTitle">高级设置</td>
+                            </tr>
+                            <tr>
                                 <td colspan="3" class="customCssCell">
                                     <label for="customOverlayCss">自定义 CSS</label>
                                     <textarea id="customOverlayCss" rows="8" spellcheck="false"
@@ -410,7 +521,11 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td colspan="3" class="liveModeSectionTitle">直播模式显示内容</td>
+                                <td colspan="3" class="displaySectionTitle liveModeSectionTitle">直播模式显示内容</td>
+                            </tr>
+                            <tr>
+                                <td>队列简洁模式</td>
+                                <td colspan="2"><label class="setting_check"><input id="queueCompactMode" type="checkbox">仅显示歌曲/歌手/点歌人表格</label></td>
                             </tr>
                             <tr>
                                 <td>当前播放卡片</td>

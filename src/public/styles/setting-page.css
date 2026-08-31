@@ -105,6 +105,28 @@
     text-align: center;
 }
 
+/* 显示设置中的分组标题，普通设置弹窗和独立设置页共用。 */
+.setting_display_page tr.displaySectionTitle {
+    background: transparent;
+}
+
+.setting_display_page tr.displaySectionTitle td {
+    padding: 14px 8px 5px;
+    color: #cfc8ff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-align: left !important;
+    text-align-last: left !important;
+}
+
+.settingControlGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
 .setting table tr td input{
     width: 90%;
     box-sizing: border-box;
@@ -370,6 +392,57 @@
     border-radius: 0 12px 12px 0;
 }
 
+/* 显示设置按功能分组，标题行不再伪装成普通配置项。 */
+.settingsOnly .setting_display_page tr.displaySectionTitle {
+    background: transparent;
+}
+
+.settingsOnly .setting_display_page tr.displaySectionTitle td {
+    width: auto;
+    padding: 18px 12px 5px;
+    border: 0;
+    border-bottom: 1px solid rgba(152, 136, 255, .28);
+    border-radius: 0;
+    color: #cfc8ff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+
+.settingsOnly .setting_display_page tr.displaySectionTitle:first-child td {
+    padding-top: 5px;
+}
+
+.settingsOnly .setting_display_page tr:not(.displaySectionTitle) td:last-child {
+    max-width: 260px;
+    color: #9899b2;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.settingsOnly .settingControlGroup {
+    width: 100%;
+}
+
+.settingsOnly .settingControlGroup > input[type="number"],
+.settingsOnly .settingControlGroup > input[type="text"],
+.settingsOnly .settingControlGroup > select {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+}
+
+.settingsOnly .settingControlGroup > input[type="color"] {
+    flex: 0 0 48px;
+    width: 48px;
+    min-width: 48px;
+    padding: 3px;
+}
+
+.settingsOnly .fontControlGroup {
+    align-items: stretch;
+}
+
 .settingsOnly .setting table tr td input:not([type="range"]),
 .settingsOnly .setting table tr td select {
     width: 100%;
@@ -426,6 +499,24 @@
     color: #8d8ea8 !important;
     font-size: 12px !important;
     line-height: 1.7;
+}
+
+.settingsOnly #lyricsFontSwitchStatus {
+    display: block;
+    min-height: 18px;
+    margin-top: 5px;
+}
+
+.settingsOnly #lyricsFontSwitchStatus[data-state="saving"] {
+    color: #d9b86c !important;
+}
+
+.settingsOnly #lyricsFontSwitchStatus[data-state="saved"] {
+    color: #72c994 !important;
+}
+
+.settingsOnly #lyricsFontSwitchStatus[data-state="failed"] {
+    color: #e58d8d !important;
 }
 
 #songListSwitchStatus {

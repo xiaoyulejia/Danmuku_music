@@ -17,6 +17,16 @@ const DEFAULT_SETTINGS = {
         overlayOpacity: 88,
         overlayBlur: 14,
         overlayTheme: 'dark',
+        queueCompactMode: false,
+        overlayBackgroundColor: '#1c1f33',
+        playerTitleColor: '#ffffff',
+        playerTitleSize: 17,
+        playerArtistColor: '#c6c7d9',
+        playerArtistSize: 12,
+        queueTextColor: '#e4e4ef',
+        queueTextSize: 12,
+        queueHeaderColor: '#9395b3',
+        queueHeaderSize: 10,
         liveShowPlayer: false,
         liveShowControls: false,
         liveShowQueueHeader: true,
@@ -27,6 +37,9 @@ const DEFAULT_SETTINGS = {
         lyricsDisplayMode: 'wrap',
         lyricsOffsetMs: 0,
         lyricsFontSize: 22,
+        lyricsFontFamily: 'Inter',
+        lyricsFontFamilyLatin: 'Inter',
+        lyricsFontFamilyCjk: 'Microsoft YaHei',
         lyricsColor: '#ffffff',
         lyricsOpacity: 100,
         lyricsOverlayLines: 1,
@@ -72,7 +85,17 @@ function mergeSettings(input = {}) {
     result.display.overlayOpacity = numeric(display.overlayOpacity, 88, 20, 100);
     result.display.overlayBlur = numeric(display.overlayBlur, 14, 0, 50);
     result.display.overlayTheme = display.overlayTheme === 'light' ? 'light' : 'dark';
-    for (const key of ['liveShowPlayer', 'liveShowControls', 'liveShowQueueHeader', 'liveShowRequester', 'liveShowAlerts']) {
+    const color = (value, fallback) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : fallback;
+    result.display.overlayBackgroundColor = color(display.overlayBackgroundColor, '#1c1f33');
+    result.display.playerTitleColor = color(display.playerTitleColor, '#ffffff');
+    result.display.playerTitleSize = numeric(display.playerTitleSize, 17, 12, 48);
+    result.display.playerArtistColor = color(display.playerArtistColor, '#c6c7d9');
+    result.display.playerArtistSize = numeric(display.playerArtistSize, 12, 10, 32);
+    result.display.queueTextColor = color(display.queueTextColor, '#e4e4ef');
+    result.display.queueTextSize = numeric(display.queueTextSize, 12, 10, 32);
+    result.display.queueHeaderColor = color(display.queueHeaderColor, '#9395b3');
+    result.display.queueHeaderSize = numeric(display.queueHeaderSize, 10, 9, 24);
+    for (const key of ['liveShowPlayer', 'liveShowControls', 'liveShowQueueHeader', 'liveShowRequester', 'liveShowAlerts', 'queueCompactMode']) {
         result.display[key] = Boolean(display[key] ?? result.display[key]);
     }
     for (const key of ['lyricsEnabled', 'lyricsTranslation', 'progressSeekEnabled', 'multiSceneHandoffEnabled', 'multiSceneAutoSwitchEnabled']) {
@@ -88,6 +111,14 @@ function mergeSettings(input = {}) {
     result.display.lyricsDisplayMode = display.lyricsDisplayMode === 'scroll' ? 'scroll' : 'wrap';
     result.display.lyricsOffsetMs = numeric(display.lyricsOffsetMs, 0, -5000, 5000);
     result.display.lyricsFontSize = numeric(display.lyricsFontSize, 22, 12, 64);
+    const normalizeFontFamily = (value, fallback) => {
+        const family = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+        return /^[\p{L}\p{N} ._-]+$/u.test(family) ? family : fallback;
+    };
+    const legacyFontFamily = normalizeFontFamily(display.lyricsFontFamily, 'Inter');
+    result.display.lyricsFontFamily = legacyFontFamily;
+    result.display.lyricsFontFamilyLatin = normalizeFontFamily(display.lyricsFontFamilyLatin || legacyFontFamily, legacyFontFamily);
+    result.display.lyricsFontFamilyCjk = normalizeFontFamily(display.lyricsFontFamilyCjk, 'Microsoft YaHei');
     result.display.lyricsColor = /^#[0-9a-f]{6}$/i.test(String(display.lyricsColor || '')) ? String(display.lyricsColor) : '#ffffff';
     result.display.lyricsOpacity = numeric(display.lyricsOpacity, 100, 10, 100);
     result.display.lyricsOverlayLines = numeric(display.lyricsOverlayLines, 1, 0, 3);

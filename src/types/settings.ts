@@ -16,6 +16,7 @@ export interface DisplaySettings {
   overlayOpacity: number;
   overlayBlur: number;
   overlayTheme: OverlayTheme;
+  queueCompactMode: boolean;
   liveShowPlayer: boolean;
   liveShowControls: boolean;
   liveShowQueueHeader: boolean;
@@ -26,6 +27,9 @@ export interface DisplaySettings {
   lyricsDisplayMode: LyricsDisplayMode;
   lyricsOffsetMs: number;
   lyricsFontSize: number;
+  lyricsFontFamily: string;
+  lyricsFontFamilyLatin: string;
+  lyricsFontFamilyCjk: string;
   lyricsColor: string;
   lyricsOpacity: number;
   lyricsOverlayLines: number;

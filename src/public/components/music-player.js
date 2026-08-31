@@ -139,6 +139,18 @@ class MusicPlayer {
         this.addListener();
         window.addEventListener('bilibili-display-settings-changed', () => {
             document.documentElement.style.setProperty('--lyrics-font-size', `${this.getDisplaySetting('lyricsFontSize', 22)}px`);
+            const normalizeFont = (family, fallback) => String(family || fallback)
+                .replace(/\s+/g, ' ')
+                .trim()
+                .replace(/[\\"'`;,{}():]/g, '') || fallback;
+            const latin = normalizeFont(
+                this.getDisplaySetting('lyricsFontFamilyLatin', this.getDisplaySetting('lyricsFontFamily', 'Inter')),
+                'Inter'
+            );
+            const cjk = normalizeFont(this.getDisplaySetting('lyricsFontFamilyCjk', 'Microsoft YaHei'), 'Microsoft YaHei');
+            document.documentElement.style.setProperty('--lyrics-font-family-latin', `"${latin.replace(/"/g, '\\"')}"`);
+            document.documentElement.style.setProperty('--lyrics-font-family-cjk', `"${cjk.replace(/"/g, '\\"')}"`);
+            document.documentElement.style.setProperty('--lyrics-font-family', `"${latin.replace(/"/g, '\\"')}"`);
             this.currentLyricIndex = -2;
             this.renderLyricsAt(this.getPlaybackPositionMs());
             this.renderPlaybackProgress(this.getPlaybackPositionMs(), this.getPlaybackDurationMs());
@@ -568,10 +580,37 @@ class MusicPlayer {
         const current = this.lyricLines[index];
         const next = this.lyricLines[index + 1];
         const overlayLineCount = Math.max(0, Math.min(3, Math.trunc(Number(this.getDisplaySetting('lyricsOverlayLines', 1)) || 0)));
+        const renderScriptText = (textElement, value) => {
+            if (!textElement) return;
+            textElement.replaceChildren();
+            const text = String(value || '');
+            if (!text) return;
+            // CJK 字符单独套用中文字体，拉丁字符、数字和常见符号使用英文字体。
+            const cjkPattern = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/u;
+            const fragment = document.createDocumentFragment();
+            let buffer = '';
+            let isCjk = null;
+            const appendBuffer = () => {
+                if (!buffer) return;
+                const span = document.createElement('span');
+                span.className = isCjk ? 'lyricsFontCjk' : 'lyricsFontLatin';
+                span.textContent = buffer;
+                fragment.appendChild(span);
+                buffer = '';
+            };
+            for (const character of text) {
+                const characterIsCjk = cjkPattern.test(character);
+                if (isCjk !== null && characterIsCjk !== isCjk) appendBuffer();
+                isCjk = characterIsCjk;
+                buffer += character;
+            }
+            appendBuffer();
+            textElement.appendChild(fragment);
+        };
         const setText = (id, value) => {
             const element = document.getElementById(id);
             const textElement = element?.querySelector('.lyricsText') || element;
-            if (textElement) textElement.textContent = value || '';
+            renderScriptText(textElement, value);
         };
         const renderStack = (id, items) => {
             const element = document.getElementById(id);
@@ -583,7 +622,7 @@ class MusicPlayer {
                 line.className = 'lyricsStackLine';
                 const text = document.createElement('span');
                 text.className = 'lyricsText';
-                text.textContent = item.text || '';
+                renderScriptText(text, item.text);
                 line.appendChild(text);
                 element.appendChild(line);
             });
@@ -610,7 +649,7 @@ class MusicPlayer {
         const translation = document.getElementById('lyricsTranslation');
         if (translation) {
             const textElement = translation.querySelector('.lyricsText') || translation;
-            textElement.textContent = current?.translation || '';
+            renderScriptText(textElement, current?.translation);
             translation.hidden = !Boolean(this.getDisplaySetting('lyricsTranslation', true)) || !current?.translation;
         }
         this.refreshLyricMarquees(positionMs);
@@ -1715,8 +1754,11 @@ class MusicPlayer {
     renderQueue() {
         if (!this.elem_orderList) return;
         const displayList = this.getQueueDisplayList();
+        const rootStyle = getComputedStyle(document.documentElement);
+        const rowHeight = Math.max(36, Number.parseFloat(rootStyle.getPropertyValue('--queue-row-height')) ||
+            40 * (Number.parseFloat(rootStyle.getPropertyValue('--frame-scale')) || 1));
         this.elem_orderList.innerHTML = '';
-        this.elem_orderList.style.height = `${displayList.length * 40}px`;
+        this.elem_orderList.style.height = `${displayList.length * rowHeight}px`;
         displayList.forEach((order, index) => {
             const tr = document.createElement('tr');
             [order.song?.sname || '', order.song?.sartist || '', order.uname || ''].forEach(value => {
@@ -1726,7 +1768,7 @@ class MusicPlayer {
             });
             // tbody 已经紧跟在表头后面，首行从 0 开始；再加 40px 会让
             // 只有一首歌时整行落到 tbody 可视区域之外。
-            tr.style.top = `${index * 40}px`;
+            tr.style.top = `${index * rowHeight}px`;
             this.elem_orderList.appendChild(tr);
         });
         this.updateQueueView();

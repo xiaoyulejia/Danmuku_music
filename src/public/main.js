@@ -1,4 +1,4 @@
-import musicPlayer from './components/music-player.js?v=20260815-3';
+import musicPlayer from './components/music-player.js?v=20260831-7';
 import './components/queue-manager.js?v=20260812-2';
 import orderConfiger from './components/order-configer.js?v=20260810-41';
 import loginConfiger from './components/login-configer.js?v=20260810-42'
@@ -48,6 +48,25 @@ async function initializeMainPage() {
         window.visualViewport?.addEventListener('resize', syncLyricViewport, { passive: true });
     }
 
+    // 框体被 OBS/浏览器缩放时同步调整文字与队列行高，避免“框变小、字不变”
+    // 导致拥挤或难以阅读。设置最小比例，保证窄框体下仍保留可读字号。
+    const syncFrameScale = () => {
+        const frame = document.querySelector('.main');
+        if (!frame || lyricOnlyMode || settingsOnly) return;
+        const width = frame.getBoundingClientRect().width || 420;
+        const scale = Math.max(.85, Math.min(1.5, width / 420));
+        document.documentElement.style.setProperty('--frame-scale', scale.toFixed(3));
+        musicPlayer.renderQueue?.();
+    };
+    requestAnimationFrame(syncFrameScale);
+    if (typeof ResizeObserver === 'function') {
+        const frameObserver = new ResizeObserver(syncFrameScale);
+        const frame = document.querySelector('.main');
+        if (frame) frameObserver.observe(frame);
+    } else {
+        window.addEventListener('resize', syncFrameScale, { passive: true });
+    }
+
     // 页面可能来自浏览器缓存，而 Node 服务已经被关闭。先独立探测后端，
     // 不让后续按钮表现成“点击无反应”。遮罩只保留重新检查按钮。
     const backendGuard = createBackendGuard(pageParams);
@@ -82,6 +101,16 @@ async function initializeMainPage() {
             overlayOpacity: Number(localStorage.getItem('overlayOpacity') || 88),
             overlayBlur: Number(localStorage.getItem('overlayBlur') || 14),
             overlayTheme: localStorage.getItem('overlayTheme') || 'dark',
+            queueCompactMode: readFlag('queueCompactMode', false),
+            overlayBackgroundColor: localStorage.getItem('overlayBackgroundColor') || '#1c1f33',
+            playerTitleColor: localStorage.getItem('playerTitleColor') || '#ffffff',
+            playerTitleSize: Number(localStorage.getItem('playerTitleSize') || 17),
+            playerArtistColor: localStorage.getItem('playerArtistColor') || '#c6c7d9',
+            playerArtistSize: Number(localStorage.getItem('playerArtistSize') || 12),
+            queueTextColor: localStorage.getItem('queueTextColor') || '#e4e4ef',
+            queueTextSize: Number(localStorage.getItem('queueTextSize') || 12),
+            queueHeaderColor: localStorage.getItem('queueHeaderColor') || '#9395b3',
+            queueHeaderSize: Number(localStorage.getItem('queueHeaderSize') || 10),
             liveShowPlayer: readFlag('liveShowPlayer', false),
             liveShowControls: readFlag('liveShowControls', false),
             liveShowQueueHeader: readFlag('liveShowQueueHeader', true),
@@ -92,6 +121,9 @@ async function initializeMainPage() {
             lyricsDisplayMode: localStorage.getItem('lyricsDisplayMode') === 'scroll' ? 'scroll' : 'wrap',
             lyricsOffsetMs: Number(localStorage.getItem('lyricsOffsetMs') || 0),
             lyricsFontSize: Number(localStorage.getItem('lyricsFontSize') || 22),
+            lyricsFontFamily: localStorage.getItem('lyricsFontFamily') || 'Inter',
+            lyricsFontFamilyLatin: localStorage.getItem('lyricsFontFamilyLatin') || localStorage.getItem('lyricsFontFamily') || 'Inter',
+            lyricsFontFamilyCjk: localStorage.getItem('lyricsFontFamilyCjk') || 'Microsoft YaHei',
             lyricsColor: localStorage.getItem('lyricsColor') || '#ffffff',
             lyricsOpacity: Number(localStorage.getItem('lyricsOpacity') || 100),
             lyricsOverlayLines: Number(localStorage.getItem('lyricsOverlayLines') || 1),
@@ -161,8 +193,11 @@ async function initializeMainPage() {
                 const hasLegacy = Object.keys(localStorage).some(key => [
                     'userMaxOrder', 'globalMaxOrder', 'orderMaxDuration', 'overLimitSkip',
                     'userHistory', 'songHistory', 'userBlackList', 'songBlackList',
-                    'overlayOpacity', 'overlayBlur', 'overlayTheme', 'customOverlayCss',
-                    'lyricsOverlayWidth', 'lyricsDisplayMode',
+                    'overlayOpacity', 'overlayBlur', 'overlayTheme', 'queueCompactMode', 'customOverlayCss',
+                    'overlayBackgroundColor', 'playerTitleColor', 'playerTitleSize',
+                    'playerArtistColor', 'playerArtistSize', 'queueTextColor', 'queueTextSize',
+                    'queueHeaderColor', 'queueHeaderSize',
+                    'lyricsOverlayWidth', 'lyricsDisplayMode', 'lyricsFontFamily', 'lyricsFontFamilyLatin', 'lyricsFontFamilyCjk',
                     'multiSceneHandoffEnabled',
                     'multiSceneAutoSwitchEnabled', 'multiSceneHeartbeatThresholdMs',
                     'songListId', 'songListHistory'
@@ -230,6 +265,16 @@ async function initializeMainPage() {
         if (style) style.textContent = customCss;
         if (editor && editor.value !== customCss) editor.value = customCss;
     };
+    const applyLyricsFontFamilies = (latin, cjk) => {
+        const normalize = (family, fallback) => String(family || fallback).replace(/\s+/g, ' ').trim().replace(/[\\"'`;,{}():]/g, '') || fallback;
+        const normalizedLatin = normalize(latin, 'Inter');
+        const normalizedCjk = normalize(cjk, 'Microsoft YaHei');
+        document.documentElement.style.setProperty('--lyrics-font-family-latin', `"${normalizedLatin}"`);
+        document.documentElement.style.setProperty('--lyrics-font-family-cjk', `"${normalizedCjk}"`);
+        // 保留旧变量，兼容尚未刷新到新 CSS 的页面。
+        document.documentElement.style.setProperty('--lyrics-font-family', `"${normalizedLatin}"`);
+        return { latin: normalizedLatin, cjk: normalizedCjk };
+    };
 
     const applyAppearance = () => {
         const display = serverDisplaySettings || {};
@@ -237,6 +282,21 @@ async function initializeMainPage() {
         const opacity = Number(value('overlayOpacity', 88));
         const blur = Number(value('overlayBlur', 14));
         const theme = value('overlayTheme', 'dark');
+        const queueCompactMode = Boolean(value('queueCompactMode', false));
+        const hexToRgb = hex => {
+            const match = /^#([0-9a-f]{6})$/i.exec(String(hex || ''));
+            return match ? [parseInt(match[1].slice(0, 2), 16), parseInt(match[1].slice(2, 4), 16), parseInt(match[1].slice(4, 6), 16)] : null;
+        };
+        const rgba = (rgb, alpha) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+        const configuredBackground = String(value('overlayBackgroundColor', '#1c1f33'));
+        const backgroundRgb = hexToRgb(configuredBackground) || [28, 31, 51];
+        const useLightDefaults = theme === 'light' && configuredBackground.toLowerCase() === '#1c1f33';
+        const cardStart = useLightDefaults ? [255, 255, 255] : backgroundRgb;
+        const cardEnd = useLightDefaults ? [239, 241, 250] : backgroundRgb.map(channel => Math.max(0, Math.round(channel * .68)));
+        const titleColor = String(value('playerTitleColor', '#ffffff')).toLowerCase() === '#ffffff' && useLightDefaults ? '#292a42' : String(value('playerTitleColor', '#ffffff'));
+        const artistColor = String(value('playerArtistColor', '#c6c7d9')).toLowerCase() === '#c6c7d9' && useLightDefaults ? '#686c88' : String(value('playerArtistColor', '#c6c7d9'));
+        const queueTextColor = String(value('queueTextColor', '#e4e4ef')).toLowerCase() === '#e4e4ef' && useLightDefaults ? '#3c3e58' : String(value('queueTextColor', '#e4e4ef'));
+        const queueHeaderColor = String(value('queueHeaderColor', '#9395b3')).toLowerCase() === '#9395b3' && useLightDefaults ? '#777b9a' : String(value('queueHeaderColor', '#9395b3'));
         const liveShowPlayer = Boolean(value('liveShowPlayer', false));
         const liveShowControls = Boolean(value('liveShowControls', false));
         const liveShowQueueHeader = Boolean(value('liveShowQueueHeader', true));
@@ -244,7 +304,19 @@ async function initializeMainPage() {
         const liveShowAlerts = Boolean(value('liveShowAlerts', false));
         document.documentElement.style.setProperty('--overlay-opacity', String(opacity / 100));
         document.documentElement.style.setProperty('--overlay-blur', `${blur}px`);
+        document.documentElement.style.setProperty('--overlay-card-background', `linear-gradient(145deg, ${rgba(cardStart, opacity / 100)}, ${rgba(cardEnd, opacity / 100)})`);
+        document.documentElement.style.setProperty('--queue-background', rgba(cardEnd, Math.max(.08, opacity / 100 * .34)));
+        document.documentElement.style.setProperty('--player-title-color', titleColor);
+        document.documentElement.style.setProperty('--player-title-size', `${Math.max(12, Math.min(48, Number(value('playerTitleSize', 17))))}px`);
+        document.documentElement.style.setProperty('--player-artist-color', artistColor);
+        document.documentElement.style.setProperty('--player-artist-size', `${Math.max(10, Math.min(32, Number(value('playerArtistSize', 12))))}px`);
+        document.documentElement.style.setProperty('--queue-text-color', queueTextColor);
+        document.documentElement.style.setProperty('--queue-text-size', `${Math.max(10, Math.min(32, Number(value('queueTextSize', 12))))}px`);
+        document.documentElement.style.setProperty('--queue-header-color', queueHeaderColor);
+        document.documentElement.style.setProperty('--queue-header-size', `${Math.max(9, Math.min(24, Number(value('queueHeaderSize', 10))))}px`);
         document.documentElement.style.setProperty('--lyrics-font-size', `${Math.max(12, Math.min(64, Number(value('lyricsFontSize', 22))))}px`);
+        const legacyFont = value('lyricsFontFamily', 'Inter');
+        applyLyricsFontFamilies(value('lyricsFontFamilyLatin', legacyFont), value('lyricsFontFamilyCjk', 'Microsoft YaHei'));
         document.documentElement.style.setProperty('--lyrics-color', String(value('lyricsColor', '#ffffff')));
         document.documentElement.style.setProperty('--lyrics-opacity', String(Math.max(.1, Math.min(1, Number(value('lyricsOpacity', 100)) / 100))));
         document.documentElement.style.setProperty('--lyrics-overlay-width', `${Math.max(50, Math.min(100, Number(value('lyricsOverlayWidth', 92))))}%`);
@@ -257,9 +329,26 @@ async function initializeMainPage() {
         document.body.classList.toggle('liveShowRequester', liveMode && liveShowRequester);
         document.body.classList.toggle('liveShowAlerts', liveMode && liveShowAlerts);
         document.body.classList.toggle('overlayLight', theme === 'light');
+        document.body.classList.toggle('liveQueueCompact', liveMode && queueCompactMode);
         const opacityInput = document.getElementById('overlayOpacity');
         const blurInput = document.getElementById('overlayBlur');
         const themeInput = document.getElementById('overlayTheme');
+        const appearanceInputs = {
+            overlayBackgroundColor: document.getElementById('overlayBackgroundColor'),
+            playerTitleColor: document.getElementById('playerTitleColor'),
+            playerTitleSize: document.getElementById('playerTitleSize'),
+            playerArtistColor: document.getElementById('playerArtistColor'),
+            playerArtistSize: document.getElementById('playerArtistSize'),
+            queueTextColor: document.getElementById('queueTextColor'),
+            queueTextSize: document.getElementById('queueTextSize'),
+            queueHeaderColor: document.getElementById('queueHeaderColor'),
+            queueHeaderSize: document.getElementById('queueHeaderSize')
+        };
+        Object.entries(appearanceInputs).forEach(([key, input]) => {
+            if (input) input.value = String(value(key, input.type === 'color' ? {
+                overlayBackgroundColor: '#1c1f33', playerTitleColor: '#ffffff', playerArtistColor: '#c6c7d9', queueTextColor: '#e4e4ef', queueHeaderColor: '#9395b3'
+            }[key] : key === 'playerTitleSize' ? 17 : key === 'playerArtistSize' ? 12 : key === 'queueTextSize' ? 12 : 10));
+        });
         const liveInputs = {
             liveShowPlayer: document.getElementById('liveShowPlayer'),
             liveShowControls: document.getElementById('liveShowControls'),
@@ -275,6 +364,8 @@ async function initializeMainPage() {
         Object.entries(liveInputs).forEach(([key, input]) => {
             if (input) input.checked = Boolean(value(key, key === 'liveShowQueueHeader' || key === 'liveShowRequester'));
         });
+        const queueCompactInput = document.getElementById('queueCompactMode');
+        if (queueCompactInput) queueCompactInput.checked = queueCompactMode;
         for (const key of ['lyricsEnabled', 'lyricsTranslation', 'progressSeekEnabled', 'multiSceneHandoffEnabled', 'multiSceneAutoSwitchEnabled']) {
             const input = document.getElementById(key);
             if (input) input.checked = Boolean(value(key, key === 'multiSceneAutoSwitchEnabled' || key === 'multiSceneHandoffEnabled' ? false : true));
@@ -290,6 +381,18 @@ async function initializeMainPage() {
         }
         const lyricsDisplayModeInput = document.getElementById('lyricsDisplayMode');
         if (lyricsDisplayModeInput) lyricsDisplayModeInput.value = value('lyricsDisplayMode', 'wrap');
+        const configuredFontFamilyLatin = String(value('lyricsFontFamilyLatin', legacyFont));
+        const configuredFontFamilyCjk = String(value('lyricsFontFamilyCjk', 'Microsoft YaHei'));
+        const fontControls = [
+            ['lyricsFontFamilyLatin', 'lyricsFontFamilyLatinSelect', configuredFontFamilyLatin, 'Inter'],
+            ['lyricsFontFamilyCjk', 'lyricsFontFamilyCjkSelect', configuredFontFamilyCjk, 'Microsoft YaHei']
+        ];
+        fontControls.forEach(([inputId, selectId, configured, fallback]) => {
+            const input = document.getElementById(inputId);
+            const select = document.getElementById(selectId);
+            if (input) input.value = configured;
+            if (select) select.value = [...select.options].some(option => option.value === configured) ? configured : fallback;
+        });
         for (const key of ['lyricsOffsetMs', 'lyricsFontSize']) {
             const input = document.getElementById(key);
             if (input) input.value = String(value(key, key === 'lyricsFontSize' ? 22 : 0));
@@ -314,6 +417,16 @@ async function initializeMainPage() {
         overlayOpacity: Number(document.getElementById('overlayOpacity')?.value || 88),
         overlayBlur: Number(document.getElementById('overlayBlur')?.value || 14),
         overlayTheme: document.getElementById('overlayTheme')?.value || 'dark',
+        queueCompactMode: Boolean(document.getElementById('queueCompactMode')?.checked),
+        overlayBackgroundColor: document.getElementById('overlayBackgroundColor')?.value || '#1c1f33',
+        playerTitleColor: document.getElementById('playerTitleColor')?.value || '#ffffff',
+        playerTitleSize: Number(document.getElementById('playerTitleSize')?.value || 17),
+        playerArtistColor: document.getElementById('playerArtistColor')?.value || '#c6c7d9',
+        playerArtistSize: Number(document.getElementById('playerArtistSize')?.value || 12),
+        queueTextColor: document.getElementById('queueTextColor')?.value || '#e4e4ef',
+        queueTextSize: Number(document.getElementById('queueTextSize')?.value || 12),
+        queueHeaderColor: document.getElementById('queueHeaderColor')?.value || '#9395b3',
+        queueHeaderSize: Number(document.getElementById('queueHeaderSize')?.value || 10),
         liveShowPlayer: Boolean(document.getElementById('liveShowPlayer')?.checked),
         liveShowControls: Boolean(document.getElementById('liveShowControls')?.checked),
         liveShowQueueHeader: Boolean(document.getElementById('liveShowQueueHeader')?.checked),
@@ -324,6 +437,9 @@ async function initializeMainPage() {
         lyricsDisplayMode: document.getElementById('lyricsDisplayMode')?.value === 'scroll' ? 'scroll' : 'wrap',
         lyricsOffsetMs: Number(document.getElementById('lyricsOffsetMs')?.value || 0),
         lyricsFontSize: Number(document.getElementById('lyricsFontSize')?.value || 22),
+        lyricsFontFamily: document.getElementById('lyricsFontFamilyLatin')?.value || 'Inter',
+        lyricsFontFamilyLatin: document.getElementById('lyricsFontFamilyLatin')?.value || 'Inter',
+        lyricsFontFamilyCjk: document.getElementById('lyricsFontFamilyCjk')?.value || 'Microsoft YaHei',
         lyricsColor: document.getElementById('lyricsColor')?.value || '#ffffff',
         lyricsOpacity: Number(document.getElementById('lyricsOpacity')?.value || 100),
         lyricsOverlayLines: Number(document.getElementById('lyricsOverlayLines')?.value || 1),
@@ -334,9 +450,7 @@ async function initializeMainPage() {
         multiSceneHeartbeatThresholdMs: Number(document.getElementById('multiSceneHeartbeatThresholdMs')?.value || 5000),
         customOverlayCss: document.getElementById('customOverlayCss')?.value || ''
     });
-    const publishDisplaySettings = () => {
-        saveAuthoritativeSettings({ display: getDisplaySettings() });
-    };
+    const publishDisplaySettings = () => saveAuthoritativeSettings({ display: getDisplaySettings() });
     await fetchAuthoritativeSettings({ migrate: true });
     applyAppearance();
 
@@ -353,20 +467,144 @@ async function initializeMainPage() {
     if (themeInput) themeInput.onchange = () => {
         publishDisplaySettings();
     };
-    ['liveShowPlayer', 'liveShowControls', 'liveShowQueueHeader', 'liveShowRequester', 'liveShowAlerts'].forEach(key => {
+    ['overlayBackgroundColor', 'playerTitleColor', 'playerTitleSize', 'playerArtistColor', 'playerArtistSize', 'queueTextColor', 'queueTextSize', 'queueHeaderColor', 'queueHeaderSize'].forEach(key => {
+        const input = document.getElementById(key);
+        if (input) input.onchange = () => publishDisplaySettings();
+    });
+    const resetColorSettingsButton = document.getElementById('resetColorSettings');
+    if (resetColorSettingsButton) resetColorSettingsButton.onclick = () => {
+        const defaults = {
+            overlayBackgroundColor: '#1c1f33',
+            playerTitleColor: '#ffffff',
+            playerArtistColor: '#c6c7d9',
+            queueTextColor: '#e4e4ef',
+            queueHeaderColor: '#9395b3',
+            lyricsColor: '#ffffff'
+        };
+        Object.entries(defaults).forEach(([key, color]) => {
+            const input = document.getElementById(key);
+            if (input) input.value = color;
+        });
+        // 先更新本页预览，再写入权威设置，避免等待轮询才看到重置效果。
+        const nextDisplay = getDisplaySettings();
+        serverDisplaySettings = { ...(serverDisplaySettings || {}), ...nextDisplay };
+        window.__displaySettings = serverDisplaySettings;
+        applyAppearance();
+        publishDisplaySettings();
+        window.dispatchEvent(new CustomEvent('bilibili-display-settings-changed'));
+    };
+    ['liveShowPlayer', 'liveShowControls', 'liveShowQueueHeader', 'liveShowRequester', 'liveShowAlerts', 'queueCompactMode'].forEach(key => {
         const input = document.getElementById(key);
         if (input) input.onchange = () => {
             publishDisplaySettings();
         };
     });
-    ['lyricsEnabled', 'lyricsTranslation', 'lyricsDisplayMode', 'lyricsOffsetMs', 'lyricsFontSize', 'lyricsColor', 'lyricsOpacity', 'lyricsOverlayLines', 'lyricsOverlayWidth', 'progressSeekEnabled', 'multiSceneHandoffEnabled', 'multiSceneAutoSwitchEnabled', 'multiSceneHeartbeatThresholdMs'].forEach(key => {
+    let fontSwitchSequence = 0;
+    ['lyricsEnabled', 'lyricsTranslation', 'lyricsDisplayMode', 'lyricsOffsetMs', 'lyricsFontSize', 'lyricsFontFamilyLatin', 'lyricsFontFamilyCjk', 'lyricsColor', 'lyricsOpacity', 'lyricsOverlayLines', 'lyricsOverlayWidth', 'progressSeekEnabled', 'multiSceneHandoffEnabled', 'multiSceneAutoSwitchEnabled', 'multiSceneHeartbeatThresholdMs'].forEach(key => {
         const input = document.getElementById(key);
         if (input) input.onchange = () => {
+            if (key === 'lyricsFontFamilyLatin' || key === 'lyricsFontFamilyCjk') {
+                const current = window.__displaySettings || {};
+                const families = applyLyricsFontFamilies(
+                    key === 'lyricsFontFamilyLatin' ? input.value : current.lyricsFontFamilyLatin || current.lyricsFontFamily || 'Inter',
+                    key === 'lyricsFontFamilyCjk' ? input.value : current.lyricsFontFamilyCjk || 'Microsoft YaHei'
+                );
+                window.__displaySettings = {
+                    ...current,
+                    lyricsFontFamily: families.latin,
+                    lyricsFontFamilyLatin: families.latin,
+                    lyricsFontFamilyCjk: families.cjk
+                };
+                const status = document.getElementById('lyricsFontSwitchStatus');
+                const label = key === 'lyricsFontFamilyCjk' ? '中文字体' : '英文字体';
+                const switchSequence = ++fontSwitchSequence;
+                if (status) {
+                    status.dataset.state = 'saving';
+                    status.textContent = `${label}正在应用：${key === 'lyricsFontFamilyCjk' ? families.cjk : families.latin}`;
+                }
+                const saveTask = publishDisplaySettings();
+                if (saveTask && typeof saveTask.then === 'function') {
+                    saveTask.then(result => {
+                        if (!status || switchSequence !== fontSwitchSequence) return;
+                        const saved = result?.display?.[key] || (key === 'lyricsFontFamilyCjk' ? families.cjk : families.latin);
+                        const savedLabel = result?.display?.[key] && result.display[key] !== (key === 'lyricsFontFamilyCjk' ? families.cjk : families.latin)
+                            ? `${saved}（已按安全规则修正）`
+                            : saved;
+                        status.dataset.state = result ? 'saved' : 'failed';
+                        status.textContent = result
+                            ? `${label}已切换：${savedLabel}`
+                            : `${label}已应用到当前页面，但保存失败，请检查服务端连接`;
+                    }).catch(() => {
+                        if (status && switchSequence === fontSwitchSequence) {
+                            status.dataset.state = 'failed';
+                            status.textContent = `${label}已应用到当前页面，但保存失败，请重试`;
+                        }
+                    });
+                }
+                window.dispatchEvent(new CustomEvent('bilibili-display-settings-changed'));
+                return;
+            }
             publishDisplaySettings();
             window.dispatchEvent(new CustomEvent('bilibili-display-settings-changed'));
         };
     });
-    if (customCssEditor) customCssEditor.value = '';
+    const loadSystemFontsButton = document.getElementById('loadSystemFonts');
+    const lyricsFontOptions = document.getElementById('lyricsFontOptions');
+    const fontControls = [
+        ['lyricsFontFamilyLatinSelect', 'lyricsFontFamilyLatin'],
+        ['lyricsFontFamilyCjkSelect', 'lyricsFontFamilyCjk']
+    ];
+    const systemFontStatus = document.getElementById('systemFontStatus');
+    const appendFontOptions = families => {
+        const known = new Set([
+            ...lyricsFontOptions.querySelectorAll('option'),
+            ...fontControls.flatMap(([selectId]) => [...document.getElementById(selectId).options])
+        ].map(option => option.value));
+        families.forEach(family => {
+            const name = String(family || '').replace(/\s+/g, ' ').trim();
+            if (!name || known.has(name)) return;
+            known.add(name);
+            const option = document.createElement('option');
+            option.value = name;
+            lyricsFontOptions.appendChild(option);
+            const selectOption = document.createElement('option');
+            selectOption.value = name;
+            selectOption.textContent = name;
+            fontControls.forEach(([selectId]) => document.getElementById(selectId).appendChild(selectOption.cloneNode(true)));
+        });
+    };
+    fontControls.forEach(([selectId, inputId]) => {
+        const select = document.getElementById(selectId);
+        const input = document.getElementById(inputId);
+        if (select && input) select.onchange = () => {
+            input.value = select.value;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+    });
+    if (loadSystemFontsButton && lyricsFontOptions) loadSystemFontsButton.onclick = async () => {
+        loadSystemFontsButton.disabled = true;
+        if (systemFontStatus) systemFontStatus.textContent = '正在读取...';
+        try {
+            let families = [];
+            const base = syncBaseForSettings || '';
+            try {
+                const response = await fetch(`${base}/live/fonts`, { cache: 'no-store' });
+                const result = await response.json();
+                if (response.ok && result.code === 0) families = result.data?.fonts || [];
+            } catch (_) { /* 浏览器 API 仍可作为后备 */ }
+            if (!families.length && typeof window.queryLocalFonts === 'function') {
+                const fonts = await window.queryLocalFonts();
+                families = (fonts || []).map(font => font.family);
+            }
+            families = [...new Set(families.map(font => String(font || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            appendFontOptions(families);
+            if (systemFontStatus) systemFontStatus.textContent = families.length ? `已加载 ${families.length} 个字体` : '未找到系统字体，请手动输入';
+        } catch (error) {
+            if (systemFontStatus) systemFontStatus.textContent = error?.name === 'NotAllowedError' ? '需要浏览器授权' : '读取失败，可手动输入';
+        } finally {
+            loadSystemFontsButton.disabled = false;
+        }
+    };
     const applyCustomCssButton = document.getElementById('applyCustomCss');
     const clearCustomCssButton = document.getElementById('clearCustomCss');
     if (applyCustomCssButton) applyCustomCssButton.onclick = () => {
@@ -389,7 +627,7 @@ async function initializeMainPage() {
         elem_setting.style.height = "0px";
         elem_orderTable.onclick = null;
     }
-    window.setInterval(() => fetchAuthoritativeSettings(), 5000);
+    window.setInterval(() => fetchAuthoritativeSettings(), 2000);
 
     // 隐藏设置界面
     document.getElementById('upBtn').onclick = () => {

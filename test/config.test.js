@@ -75,3 +75,38 @@ test('multi-scene auto settings default safely and clamp the heartbeat threshold
     } }).display;
     assert.strictEqual(disabled.multiSceneAutoSwitchEnabled, false);
 });
+
+test('display appearance settings are validated and clamped', () => {
+    const display = mergeSettings({ display: {
+        overlayBackgroundColor: '#123456',
+        playerTitleColor: 'invalid',
+        playerTitleSize: 999,
+        playerArtistSize: 1,
+        queueTextSize: 24,
+        queueHeaderSize: 100
+    } }).display;
+    assert.strictEqual(display.overlayBackgroundColor, '#123456');
+    assert.strictEqual(display.playerTitleColor, '#ffffff');
+    assert.strictEqual(display.playerTitleSize, 48);
+    assert.strictEqual(display.playerArtistSize, 10);
+    assert.strictEqual(display.queueTextSize, 24);
+    assert.strictEqual(display.queueHeaderSize, 24);
+});
+
+test('queue compact mode defaults off and persists as a boolean', () => {
+    assert.strictEqual(mergeSettings().display.queueCompactMode, false);
+    assert.strictEqual(mergeSettings({ display: { queueCompactMode: 1 } }).display.queueCompactMode, true);
+    assert.strictEqual(mergeSettings({ display: { queueCompactMode: 0 } }).display.queueCompactMode, false);
+});
+
+test('lyrics font family accepts system names and rejects unsafe values', () => {
+    const defaults = mergeSettings().display;
+    assert.strictEqual(defaults.lyricsFontFamily, 'Inter');
+    assert.strictEqual(defaults.lyricsFontFamilyLatin, 'Inter');
+    assert.strictEqual(defaults.lyricsFontFamilyCjk, 'Microsoft YaHei');
+    assert.strictEqual(mergeSettings({ display: { lyricsFontFamily: 'Microsoft YaHei' } }).display.lyricsFontFamily, 'Microsoft YaHei');
+    assert.strictEqual(mergeSettings({ display: { lyricsFontFamily: 'Arial; color:red' } }).display.lyricsFontFamily, 'Inter');
+    assert.strictEqual(mergeSettings({ display: { lyricsFontFamilyLatin: 'Arial' } }).display.lyricsFontFamilyLatin, 'Arial');
+    assert.strictEqual(mergeSettings({ display: { lyricsFontFamilyCjk: 'SimHei' } }).display.lyricsFontFamilyCjk, 'SimHei');
+    assert.strictEqual(mergeSettings({ display: { lyricsFontFamilyCjk: 'SimHei; color:red' } }).display.lyricsFontFamilyCjk, 'Microsoft YaHei');
+});

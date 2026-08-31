@@ -3,6 +3,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 const encrypt = require('../utils/encrypt');
 const { LocalStore, mergeSettings } = require('../services/local-store');
 const { getBiliSession } = require('../services/bili-session');
@@ -49,6 +50,25 @@ const MAX_COMMAND_LOG_ENTRIES = 1000;
 const MAX_COMMAND_LOG_BYTES = 512 * 1024;
 const COMMAND_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_QUEUE_REORDER_ITEMS = 5000;
+let systemFontCache = { expiresAt: 0, fonts: [] };
+
+function readWindowsSystemFonts() {
+    if (process.platform !== 'win32') return Promise.resolve([]);
+    const registryKeys = [
+        'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts',
+        'HKCU\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'
+    ];
+    return Promise.all(registryKeys.map(key => new Promise(resolve => {
+        execFile('reg.exe', ['query', key], { windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+            if (error) return resolve([]);
+            const fonts = String(stdout || '').split(/\r?\n/).map(line => {
+                const match = /^\s{2,}(.+?)\s+REG_(?:SZ|EXPAND_SZ)\s+/i.exec(line);
+                return match ? match[1].replace(/\s+\((?:TrueType|OpenType|Variable)\)$/i, '').trim() : '';
+            }).filter(name => name && !name.startsWith('@'));
+            resolve(fonts);
+        });
+    }))).then(groups => [...new Set(groups.flat())].sort((a, b) => a.localeCompare(b)));
+}
 
 function syncFilePath(prefix, roomId) {
     return path.join(sharedSyncDir, `${prefix}-${String(roomId).replace(/[^0-9a-z_-]/gi, '_')}.json`);
@@ -1129,6 +1149,19 @@ router.use((req, res, next) => {
 router.get('/live/health', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.json({ code: 0, data: { service: 'order', pid: process.pid, now: Date.now(), buildId: process.env.DAMUKU_BUILD_ID || '' } });
+});
+
+// 通过本机服务读取 Windows 字体注册表，兼容 OBS/直播姬等不支持 queryLocalFonts 的 WebView。
+router.get('/live/fonts', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+        if (systemFontCache.expiresAt <= Date.now()) {
+            systemFontCache = { expiresAt: Date.now() + 5 * 60 * 1000, fonts: await readWindowsSystemFonts() };
+        }
+        res.json({ code: 0, data: { fonts: systemFontCache.fonts } });
+    } catch (_) {
+        res.json({ code: 0, data: { fonts: [] } });
+    }
 });
 
 router.get('/live/settings', (req, res) => {

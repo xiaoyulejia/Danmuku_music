@@ -1,5 +1,5 @@
 import musicPlayer from './components/music-player.js?v=20260831-7';
-import './components/queue-manager.js?v=20260812-2';
+import './components/queue-manager.js?v=20260902-3';
 import orderConfiger from './components/order-configer.js?v=20260810-41';
 import loginConfiger from './components/login-configer.js?v=20260810-42'
 import danmuConfiger from './components/danmu-configer.js?v=20260816-1';

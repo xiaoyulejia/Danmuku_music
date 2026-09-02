@@ -127,7 +127,7 @@
     width: 100%;
 }
 
-.setting table tr td input{
+body:not(.settingsOnly) .setting table tr td input:not([type="checkbox"]):not([type="color"]):not([type="range"]){
     width: 90%;
     box-sizing: border-box;
     padding: 3px;
@@ -141,14 +141,14 @@
     transition: .5s;
 }
 
-.setting table tr td input:hover{
+body:not(.settingsOnly) .setting table tr td input:not([type="checkbox"]):not([type="color"]):not([type="range"]):hover{
     width: 100%;
     box-shadow: 0px 0px 10px white;
     background: white;
 }
 
 /* 选择框样式 */
-.setting table tr td select{
+body:not(.settingsOnly) .setting table tr td select{
     width: 100%;
     padding: 3px;
     border: 1px solid grey;
@@ -166,7 +166,7 @@
     box-shadow: 0px 0px 10px black;
 }
 
-.setting table tr td select:hover{
+body:not(.settingsOnly) .setting table tr td select:hover{
     box-shadow: 0px 0px 20px black;
 }
 
@@ -436,55 +436,157 @@
     flex: 0 0 48px;
     width: 48px;
     min-width: 48px;
-    padding: 3px;
 }
 
 .settingsOnly .fontControlGroup {
     align-items: stretch;
 }
 
-.settingsOnly .setting table tr td input:not([type="range"]),
-.settingsOnly .setting table tr td select {
+.settingsOnly .setting input[type="text"],
+.settingsOnly .setting input[type="search"],
+.settingsOnly .setting input[type="number"],
+.settingsOnly .setting textarea,
+.settingsOnly .setting select,
+.settingsOnly .queueSearchForm input {
     width: 100%;
-    min-height: 34px;
-    padding: 7px 9px;
+    min-height: 36px;
+    padding: 8px 11px;
+    box-sizing: border-box;
     color: #f0efff;
     border: 1px solid rgba(255, 255, 255, .14);
-    border-radius: 8px;
-    background: rgba(9, 10, 20, .45);
+    border-radius: 10px;
+    outline: none;
+    background: rgba(9, 10, 20, .58);
+    font: inherit;
     font-size: 13px;
     text-align: left;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 
-.settingsOnly .setting table tr td input:not([type="range"]):focus,
-.settingsOnly .setting table tr td select:focus,
-.settingsOnly .setting table tr td textarea:focus {
-    border-color: #9888ff;
+.settingsOnly .setting table tr td input[type="text"]:hover,
+.settingsOnly .setting table tr td input[type="search"]:hover,
+.settingsOnly .setting table tr td input[type="number"]:hover,
+.settingsOnly .setting table tr td select:hover {
+    width: 100%;
+    background: rgba(16, 17, 33, .82);
+    border-color: rgba(152, 136, 255, .48);
+    box-shadow: none;
+}
+
+.settingsOnly .setting input[type="color"] {
+    width: 48px;
+    min-width: 48px;
+    height: 36px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 10px;
     outline: none;
-    box-shadow: 0 0 0 3px rgba(152, 136, 255, .14);
+    background: rgba(9, 10, 20, .58);
+    cursor: pointer;
 }
 
-.settingsOnly .setting table button {
+.settingsOnly .setting input[type="color"]:focus {
+    border-color: rgba(152, 136, 255, .48);
+    box-shadow: none;
+}
+
+.settingsOnly .setting input[type="range"] {
+    width: 100%;
+    height: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    outline: none;
+    accent-color: #9a87ff;
+    background: rgba(255, 255, 255, .15);
+    cursor: pointer;
+}
+
+.settingsOnly .setting input[type="checkbox"] {
+    width: 18px !important;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    outline: none;
+    accent-color: #9a87ff;
+    background: transparent;
+    cursor: pointer;
+}
+
+.settingsOnly .setting_check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    color: #e6e4ff;
+    cursor: pointer;
+}
+
+.settingsOnly .setting_check input[type="checkbox"]:focus {
+    box-shadow: none;
+}
+
+.settingsOnly .setting table tr td textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.settingsOnly .setting input[type="text"]:focus,
+.settingsOnly .setting input[type="search"]:focus,
+.settingsOnly .setting input[type="number"]:focus,
+.settingsOnly .setting textarea:focus,
+.settingsOnly .setting select:focus,
+.settingsOnly .queueSearchForm input:focus,
+.settingsOnly .setting table tr td textarea:focus {
+    border-color: rgba(152, 136, 255, .48);
+    outline: none;
+    box-shadow: none;
+}
+
+.settingsOnly .setting button:not(.setting_btn):not(#upBtn) {
     width: auto;
+    min-height: 36px;
     min-width: 86px;
-    padding: 8px 12px;
+    padding: 8px 13px;
     color: #f8f7ff;
     border: 1px solid rgba(255, 255, 255, .14);
-    background: rgba(125, 105, 255, .22);
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(145, 126, 255, .32), rgba(105, 93, 214, .28));
+    box-shadow: 0 5px 14px rgba(55, 43, 132, .16);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
     white-space: nowrap;
+    transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 
-.settingsOnly .setting table button:hover {
-    background: rgba(145, 126, 255, .42);
-    box-shadow: none;
+.settingsOnly .setting button:not(.setting_btn):not(#upBtn):hover:not(:disabled) {
+    border-color: rgba(190, 181, 255, .5);
+    background: linear-gradient(135deg, rgba(157, 140, 255, .5), rgba(119, 105, 232, .42));
+    box-shadow: 0 8px 18px rgba(55, 43, 132, .28);
+    transform: translateY(-1px);
+}
+
+.settingsOnly .setting button:not(.setting_btn):not(#upBtn):focus-visible {
+    border-color: rgba(152, 136, 255, .48);
+    outline: none;
+    box-shadow: 0 5px 14px rgba(55, 43, 132, .16);
+}
+
+.settingsOnly .setting button:not(.setting_btn):not(#upBtn):disabled {
+    opacity: .48;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .settingsOnly .setting_display_page input[type="range"] {
     width: 100%;
-    height: 5px;
-    padding: 0;
-    accent-color: #9a87ff;
-    background: rgba(255, 255, 255, .15);
+    height: 6px;
 }
 
 .settingsOnly .setting_display_page output {
@@ -638,6 +740,84 @@
     margin-top: 14px;
 }
 
+.queueSearchPanel {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, .1);
+}
+
+.queueSearchPanel h3 {
+    margin: 0 0 5px;
+    color: #f5f4ff;
+    font-size: 15px;
+}
+
+.queueSearchForm {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.queueSearchForm input {
+    min-width: 0;
+    flex: 1;
+}
+
+.queueSearchForm button {
+    flex: 0 0 auto;
+    width: auto !important;
+    min-width: 64px;
+}
+
+.queueSearchStatus {
+    min-height: 18px;
+    margin: 8px 0 4px;
+    color: #aaa9c0;
+    font-size: 12px;
+}
+
+.queueSearchStatus[data-state="loading"] { color: #d9b86c; }
+.queueSearchStatus[data-state="success"] { color: #72c994; }
+.queueSearchStatus[data-state="error"] { color: #e58b8b; }
+
+.queueSearchResults {
+    display: grid;
+    gap: 7px;
+}
+
+.queueSearchResult {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .04);
+}
+
+.queueSearchSong {
+    min-width: 0;
+    flex: 1;
+}
+
+.queueSearchSong strong,
+.queueSearchSong span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.queueSearchSong strong { color: #e9e7ff; }
+.queueSearchSong span { margin-top: 2px; color: #aaa9c0; font-size: 12px; }
+
+.queueSearchResult button {
+    flex: 0 0 auto;
+    width: auto !important;
+    min-width: 72px;
+    padding: 7px 9px !important;
+}
+
 .queueManagerStatus {
     min-height: 20px;
     margin: 10px 0 0;
@@ -686,8 +866,8 @@
 }
 
 .settingsOnly .customCssCell textarea:focus {
-    border-color: #9888ff;
-    box-shadow: 0 0 0 3px rgba(152, 136, 255, .14);
+    border-color: rgba(152, 136, 255, .48);
+    box-shadow: none;
 }
 
 .settingsOnly .customCssCell .setting_tip {

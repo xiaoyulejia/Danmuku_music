@@ -96,3 +96,40 @@ test('sync-command rejects untrusted origins and deduplicates command ids', asyn
         cleanupRoom(roomId);
     }
 });
+
+test('queue manager manual orders bypass per-user cap but keep canonical metadata', async () => {
+    const roomId = `typecheck-${Date.now()}-manual`;
+    const { server, base } = await createServer();
+    try {
+        const add = async (sid, name) => fetch(`${base}/live/sync-command`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                room_id: roomId,
+                command: {
+                    id: `manual-${sid}`,
+                    command: 'addOrder',
+                    value: {
+                        uid: -1,
+                        uname: '队列管理',
+                        source: 'manual',
+                        song: { platform: 'wy', sid, sname: name, sartist: '测试歌手', duration: 120 }
+                    }
+                }
+            })
+        });
+        const first = await add('manual-1', '第一首');
+        const second = await add('manual-2', '第二首');
+        assert.equal(first.status, 200);
+        assert.equal(second.status, 200);
+        const firstBody = await first.json();
+        const secondBody = await second.json();
+        assert.equal(firstBody.result.accepted, true);
+        assert.equal(secondBody.result.accepted, true);
+        assert.equal(secondBody.data.queue.filter(item => item.source === 'manual').length, 2);
+        assert.equal(secondBody.data.queue[1].uname, '队列管理');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+        cleanupRoom(roomId);
+    }
+});

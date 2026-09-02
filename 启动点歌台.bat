@@ -9,7 +9,7 @@ set "NPM_MIRROR=https://registry.npmmirror.com"
 set "NPM_OFFICIAL=https://registry.npmjs.org"
 
 echo ========================================
-echo        Damuku_music 点歌台启动器
+echo        Danmuku_music 点歌台启动器
 echo ========================================
 echo.
 

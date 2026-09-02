@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Damuku_music</title>
     <!-- DEV/STA 产品版本与前端构建号由 config/version.js 生成到 version.js。 -->
-    <script src="./version.js?v=20260902-1"></script>
+    <script src="./version.js?v=20260902-3"></script>
     <!-- 库文件 -->
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/pako/2.0.3/pako.min.js"></script>
@@ -20,7 +20,7 @@
     <!-- 点歌面板样式 -->
     <link rel="stylesheet" href="./styles/order-table.css?v=20260809-16">
     <!-- 设置面板样式 -->
-    <link rel="stylesheet" href="./styles/setting-page.css?v=20260831-8">
+    <link rel="stylesheet" href="./styles/setting-page.css?v=20260902-3">
     <style id="customOverlayStyle"></style>
 </head>
 
@@ -571,6 +571,16 @@
                             <button id="saveQueueOrder" type="button" disabled>保存顺序</button>
                             <button id="cancelQueueOrder" type="button" disabled>撤销修改</button>
                             <button id="refreshQueue" type="button">刷新队列</button>
+                        </div>
+                        <div class="queueSearchPanel">
+                            <h3>网易云点歌</h3>
+                            <p class="setting_tip">输入歌曲名或歌手名搜索，选择结果后加入待播队列。</p>
+                            <form id="queueSearchForm" class="queueSearchForm">
+                                <input id="queueSearchInput" type="search" maxlength="100" autocomplete="off" placeholder="例如：周杰伦 晴天" aria-label="网易云歌曲搜索">
+                                <button id="queueSearchButton" type="submit">搜索</button>
+                            </form>
+                            <p id="queueSearchStatus" class="queueSearchStatus" role="status" aria-live="polite"></p>
+                            <div id="queueSearchResults" class="queueSearchResults" aria-live="polite"></div>
                         </div>
                         <p id="queueManagerStatus" class="queueManagerStatus" role="status" aria-live="polite"></p>
                     </section>

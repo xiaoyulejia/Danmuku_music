@@ -176,12 +176,16 @@ class WyMusicServer {
     /* 搜索歌曲信息 
         @param keyword 关键词
     */
-    async getSongInfo(keyword) {
+    async searchSongs(keyword, limit = 10) {
+        const normalizedKeyword = String(keyword || '').trim();
+        if (!normalizedKeyword) return [];
+        const safeLimit = Math.max(1, Math.min(30, Number(limit) || 10));
         const startedAt = Date.now();
         this.debugLog('歌曲搜索请求', {
             method: 'GET',
             url: `${this.baseUrl}/search`,
-            keywords: keyword,
+            keywords: normalizedKeyword,
+            limit: safeLimit,
             cookiePresent: Boolean(this.cookie)
         });
         try {
@@ -190,28 +194,28 @@ class WyMusicServer {
                 url: this.baseUrl + "/search",
                 params: {
                     cookie: this.cookie,
-                    keywords: keyword,
-                    limit: 10,
+                    keywords: normalizedKeyword,
+                    limit: safeLimit,
                     type: 1,
                 }
             });
-            const songs = resp.data?.result?.songs || [];
-            const first = songs[0];
-            const song = first ? {
+            const songs = Array.isArray(resp.data?.result?.songs) ? resp.data.result.songs : [];
+            const mappedSongs = songs.map(song => ({
                 platform: "wy",
-                sid: first.id,
-                sname: first.name,
-                sartist: first.artists?.[0]?.name || '未知歌手',
-                duration: (first.duration || 0) / 1000,
-            } : null;
+                sid: song.id,
+                sname: song.name,
+                sartist: (Array.isArray(song.artists) ? song.artists : [])
+                    .map(artist => artist?.name).filter(Boolean).join(' / ') || '未知歌手',
+                duration: (song.duration || 0) / 1000,
+            })).filter(song => song.sid != null && song.sname);
             this.debugLog('歌曲搜索响应', {
                 status: resp.status,
                 code: resp.data?.code,
                 count: songs.length,
-                song: song ? { sid: song.sid, sname: song.sname, artist: song.sartist } : null,
+                mappedCount: mappedSongs.length,
                 elapsedMs: Date.now() - startedAt
             });
-            return song;
+            return mappedSongs;
         } catch (error) {
             this.debugLog('歌曲搜索失败', {
                 status: error.response?.status,
@@ -220,8 +224,12 @@ class WyMusicServer {
                 elapsedMs: Date.now() - startedAt
             });
             console.log("歌曲搜索失败!", error.response?.data || error.message);
-            return null;
+            return [];
         }
+    }
+
+    async getSongInfo(keyword) {
+        return (await this.searchSongs(keyword, 1))[0] || null;
     }
 
     /* 获取歌曲链接

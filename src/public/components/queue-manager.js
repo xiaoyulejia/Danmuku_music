@@ -1,4 +1,5 @@
-import musicPlayer from './music-player.js?v=20260812-23';
+import musicPlayer from './music-player.js?v=20260902-3';
+import musicServer from '../services/musicServers/music-server.js?v=20260902-3';
 
 class QueueManager {
     constructor() {
@@ -8,13 +9,20 @@ class QueueManager {
         this.cancelButton = document.getElementById('cancelQueueOrder');
         this.refreshButton = document.getElementById('refreshQueue');
         this.status = document.getElementById('queueManagerStatus');
+        this.searchForm = document.getElementById('queueSearchForm');
+        this.searchInput = document.getElementById('queueSearchInput');
+        this.searchButton = document.getElementById('queueSearchButton');
+        this.searchStatus = document.getElementById('queueSearchStatus');
+        this.searchResultsElement = document.getElementById('queueSearchResults');
         this.originalOrderIds = [];
         this.draftOrderIds = [];
         this.orders = new Map();
+        this.searchResults = [];
         this.stateRevision = 0;
         this.queueRevision = 0;
         this.currentOrderId = '';
         this.busy = false;
+        this.searchBusy = false;
         this.draggingId = '';
 
         if (!this.list) return;
@@ -22,6 +30,15 @@ class QueueManager {
         this.saveButton?.addEventListener('click', () => this.saveOrder());
         this.cancelButton?.addEventListener('click', () => this.cancelDraft());
         this.refreshButton?.addEventListener('click', () => this.refresh());
+        this.searchForm?.addEventListener('submit', event => {
+            event.preventDefault();
+            this.searchSongs();
+        });
+        this.searchResultsElement?.addEventListener('click', event => {
+            const button = event.target.closest('button[data-search-index]');
+            if (!button) return;
+            this.addSearchResult(Number(button.dataset.searchIndex));
+        });
         this.list.addEventListener('click', event => this.handleListClick(event));
         this.list.addEventListener('pointerdown', event => this.startDrag(event));
         this.refresh();
@@ -31,6 +48,12 @@ class QueueManager {
         if (!this.status) return;
         this.status.textContent = message;
         this.status.dataset.state = type;
+    }
+
+    setSearchStatus(message, type = '') {
+        if (!this.searchStatus) return;
+        this.searchStatus.textContent = message;
+        this.searchStatus.dataset.state = type;
     }
 
     applyState(state) {
@@ -125,6 +148,97 @@ class QueueManager {
         });
         this.saveButton.disabled = this.busy || !this.isDraftDirty();
         this.cancelButton.disabled = this.busy || !this.isDraftDirty();
+        if (this.searchButton) this.searchButton.disabled = this.busy || this.searchBusy;
+        if (this.searchInput) this.searchInput.disabled = this.busy || this.searchBusy;
+        this.searchResultsElement?.querySelectorAll('button[data-search-index]')
+            .forEach(button => { button.disabled = this.busy || this.searchBusy; });
+    }
+
+    renderSearchResults() {
+        if (!this.searchResultsElement) return;
+        this.searchResultsElement.replaceChildren();
+        this.searchResults.forEach((song, index) => {
+            const item = document.createElement('article');
+            item.className = 'queueSearchResult';
+            const details = document.createElement('div');
+            details.className = 'queueSearchSong';
+            const name = document.createElement('strong');
+            name.textContent = song.sname || '未命名歌曲';
+            const metadata = document.createElement('span');
+            const duration = Number(song.duration) > 0
+                ? ` · ${Math.floor(Number(song.duration) / 60)}:${String(Math.floor(Number(song.duration) % 60)).padStart(2, '0')}`
+                : '';
+            metadata.textContent = `${song.sartist || '未知歌手'}${duration}`;
+            details.append(name, metadata);
+            const add = document.createElement('button');
+            add.type = 'button';
+            add.dataset.searchIndex = String(index);
+            add.textContent = '加入队列';
+            add.disabled = this.busy || this.searchBusy;
+            item.append(details, add);
+            this.searchResultsElement.appendChild(item);
+        });
+    }
+
+    async searchSongs() {
+        if (this.busy || this.searchBusy) return;
+        const keyword = this.searchInput?.value.trim() || '';
+        if (!keyword) {
+            this.searchResults = [];
+            this.renderSearchResults();
+            this.setSearchStatus('请输入歌曲名或歌手名', 'error');
+            this.searchInput?.focus();
+            return;
+        }
+        this.searchBusy = true;
+        this.searchResults = [];
+        this.renderSearchResults();
+        this.setSearchStatus('正在搜索网易云音乐…', 'loading');
+        this.render(this.orders.get(this.currentOrderId));
+        try {
+            const server = musicServer.getServer('wy');
+            this.searchResults = await server.searchSongs(keyword, 10);
+            this.renderSearchResults();
+            this.setSearchStatus(
+                this.searchResults.length ? `找到 ${this.searchResults.length} 首歌曲，请选择要加入的歌曲` : '没有找到匹配的歌曲',
+                this.searchResults.length ? 'success' : 'error'
+            );
+        } catch (error) {
+            this.searchResults = [];
+            this.renderSearchResults();
+            this.setSearchStatus(error?.message || '搜索失败，请稍后重试', 'error');
+        } finally {
+            this.searchBusy = false;
+            this.render(this.orders.get(this.currentOrderId));
+        }
+    }
+
+    async addSearchResult(index) {
+        const song = this.searchResults[index];
+        if (!song || this.busy || this.searchBusy) return;
+        this.busy = true;
+        this.render(this.orders.get(this.currentOrderId));
+        this.setSearchStatus(`正在加入“${song.sname}”…`, 'loading');
+        try {
+            const response = await musicPlayer.sendCommand('addOrder', {
+                uid: -1,
+                uname: '队列管理',
+                source: 'manual',
+                song
+            });
+            if (response?.state) musicPlayer.applySharedState(response.state);
+            if (!response?.ok) {
+                const reason = response?.result?.result?.reason || response?.result?.reason || response?.reason || '歌曲未能加入队列';
+                this.setSearchStatus(reason, 'error');
+                return;
+            }
+            this.setSearchStatus(`已将“${song.sname}”加入队列`, 'success');
+        } catch (error) {
+            this.setSearchStatus(error?.message || '加入队列失败，请稍后重试', 'error');
+        } finally {
+            this.busy = false;
+            this.render(this.orders.get(this.currentOrderId));
+        }
     }
 
     isDraftDirty() {

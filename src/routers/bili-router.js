@@ -902,10 +902,13 @@ function applyRoomCommand(roomId, command) {
                 result = { accepted: false, command: command.command, reason: '点歌数据无效' };
                 break;
             }
+            // 设置页的本地点歌使用 uid=-1/source=manual，跳过普通用户点歌数限制，
+            // 但仍保留全局队列、时长、黑名单和重复歌曲校验。
+            const isManualOrder = value?.source === 'manual' && Number(value?.uid) === -1;
             const orderSettings = state.settings.order || mergeSettings().order;
             const userOrders = state.queue.filter(item => Number(item.uid) === Number(order.uid));
             const activeOrders = state.queue.filter(item => Number(item.uid) !== 0);
-            if (userOrders.length >= orderSettings.userMaxOrder) {
+            if (!isManualOrder && userOrders.length >= orderSettings.userMaxOrder) {
                 result = { accepted: false, command: command.command, reason: '该用户点歌数已达上限' };
                 break;
             }
@@ -926,10 +929,10 @@ function applyRoomCommand(roomId, command) {
                 result = { accepted: false, command: command.command, reason: '歌曲已在点歌列表中' };
                 break;
             }
-            // 客户端不能决定一次点歌的身份；服务端为每次新入队生成新 ID。
+            // 服务端为每次新入队生成新 ID，手动点歌仅允许受控的管理页标记。
             order.orderId = createOrderId();
             order.requestedAt = Date.now();
-            order.source = 'danmu';
+            order.source = isManualOrder ? 'manual' : 'danmu';
             state.queue.push(order);
             if (!state.currentSong) {
                 state.currentSong = order.song;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>点歌台启动器</title>
-    <script src="./version.js?v=20260831-1"></script>
+    <script src="./version.js?v=20260902-1"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -137,6 +137,13 @@
             <option value="1" selected>1 个场景（scene-a）</option>
             <option value="2">2 个场景（scene-a ～ scene-b）</option>
             <option value="3">3 个场景（scene-a ～ scene-c）</option>
+            <option value="4">4 个场景（scene-a ～ scene-d）</option>
+            <option value="5">5 个场景（scene-a ～ scene-e）</option>
+            <option value="6">6 个场景（scene-a ～ scene-f）</option>
+            <option value="7">7 个场景（scene-a ～ scene-g）</option>
+            <option value="8">8 个场景（scene-a ～ scene-h）</option>
+            <option value="9">9 个场景（scene-a ～ scene-i）</option>
+            <option value="10">10 个场景（scene-a ～ scene-j）</option>
         </select>
     </div>
     <p id="error" role="alert"></p>
@@ -268,7 +275,7 @@
         const lyricLink = document.getElementById('lyricLink');
         lyricLink.href = lyricUrl;
         lyricLink.textContent = lyricUrl;
-        renderSceneLinks(roomId, Math.min(3, Math.max(1, Number(sceneCountInput.value) || 1)));
+        renderSceneLinks(roomId, Math.min(10, Math.max(1, Number(sceneCountInput.value) || 1)));
         document.getElementById('settingsLink').href = settingsUrl;
         links.hidden = false;
         history.replaceState(null, '', `?roomid=${encodeURIComponent(roomId)}`);
@@ -291,7 +298,7 @@
     sceneCountInput.addEventListener('change', () => {
         const roomId = roomInput.value.trim();
         if (/^[1-9]\d*$/.test(roomId) && !links.hidden) {
-            renderSceneLinks(roomId, Math.min(3, Math.max(1, Number(sceneCountInput.value) || 1)));
+            renderSceneLinks(roomId, Math.min(10, Math.max(1, Number(sceneCountInput.value) || 1)));
         }
     });
 

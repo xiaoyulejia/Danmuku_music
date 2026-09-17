@@ -1,5 +1,5 @@
-import musicPlayer from './music-player.js?v=20260902-3';
-import musicServer from '../services/musicServers/music-server.js?v=20260902-3';
+import musicPlayer from './music-player.js?v=20260917-1';
+import musicServer from '../services/musicServers/music-server.js?v=20260917-1';
 
 class QueueManager {
     constructor() {
@@ -303,19 +303,25 @@ class QueueManager {
         this.busy = true;
         this.render(this.orders.get(this.currentOrderId));
         this.setStatus('正在设置下一首…', 'loading');
-        const response = await musicPlayer.sendCommand('promoteNext', {
-            orderId,
-            expectedQueueRevision: this.queueRevision,
-            expectedCurrentOrderId: this.currentOrderId
-        });
-        this.busy = false;
-        if (response?.state) musicPlayer.applySharedState(response.state);
-        if (!response?.ok) {
-            await this.refresh();
-            this.setStatus(response?.result?.result?.reason || '队列已变化，请重新选择', 'error');
-            return;
+        try {
+            const response = await musicPlayer.sendCommand('promoteNext', {
+                orderId,
+                expectedQueueRevision: this.queueRevision,
+                expectedCurrentOrderId: this.currentOrderId
+            });
+            if (response?.state) musicPlayer.applySharedState(response.state);
+            if (!response?.ok) {
+                await this.refresh();
+                this.setStatus(response?.result?.result?.reason || '队列已变化，请重新选择', 'error');
+                return;
+            }
+            this.setStatus(response.result?.result?.moved === false ? '该歌曲已经是下一首' : '已设为下一首', 'success');
+        } catch (error) {
+            this.setStatus(error?.message || '设置下一首失败，请稍后重试', 'error');
+        } finally {
+            this.busy = false;
+            this.render(this.orders.get(this.currentOrderId));
         }
-        this.setStatus(response.result?.result?.moved === false ? '该歌曲已经是下一首' : '已设为下一首', 'success');
     }
 
     async remove(orderId) {
@@ -326,19 +332,25 @@ class QueueManager {
         this.busy = true;
         this.render(this.orders.get(this.currentOrderId));
         this.setStatus('正在删除歌曲…', 'loading');
-        const response = await musicPlayer.sendCommand('removeOrder', {
-            orderId,
-            expectedQueueRevision: this.queueRevision,
-            expectedCurrentOrderId: this.currentOrderId
-        });
-        this.busy = false;
-        if (response?.state) musicPlayer.applySharedState(response.state);
-        if (!response?.ok) {
-            await this.refresh();
-            this.setStatus(response?.result?.result?.reason || '队列已变化，请重新选择', 'error');
-            return;
+        try {
+            const response = await musicPlayer.sendCommand('removeOrder', {
+                orderId,
+                expectedQueueRevision: this.queueRevision,
+                expectedCurrentOrderId: this.currentOrderId
+            });
+            if (response?.state) musicPlayer.applySharedState(response.state);
+            if (!response?.ok) {
+                await this.refresh();
+                this.setStatus(response?.result?.result?.reason || '队列已变化，请重新选择', 'error');
+                return;
+            }
+            this.setStatus(response.result?.result?.removed === true ? '歌曲已删除' : '歌曲未删除', 'success');
+        } catch (error) {
+            this.setStatus(error?.message || '删除歌曲失败，请稍后重试', 'error');
+        } finally {
+            this.busy = false;
+            this.render(this.orders.get(this.currentOrderId));
         }
-        this.setStatus(response.result?.result?.removed === true ? '歌曲已删除' : '歌曲未删除', 'success');
     }
 
     async saveOrder() {
@@ -346,19 +358,25 @@ class QueueManager {
         this.busy = true;
         this.render(this.orders.get(this.currentOrderId));
         this.setStatus('正在保存顺序…', 'loading');
-        const response = await musicPlayer.sendCommand('reorderQueue', {
-            expectedQueueRevision: this.queueRevision,
-            expectedCurrentOrderId: this.currentOrderId,
-            pendingOrderIds: this.draftOrderIds.slice()
-        });
-        this.busy = false;
-        if (response?.state) musicPlayer.applySharedState(response.state);
-        if (!response?.ok) {
-            await this.refresh();
-            this.setStatus('队列已变化，请重新确认排序', 'error');
-            return;
+        try {
+            const response = await musicPlayer.sendCommand('reorderQueue', {
+                expectedQueueRevision: this.queueRevision,
+                expectedCurrentOrderId: this.currentOrderId,
+                pendingOrderIds: this.draftOrderIds.slice()
+            });
+            if (response?.state) musicPlayer.applySharedState(response.state);
+            if (!response?.ok) {
+                await this.refresh();
+                this.setStatus('队列已变化，请重新确认排序', 'error');
+                return;
+            }
+            this.setStatus('队列顺序已保存', 'success');
+        } catch (error) {
+            this.setStatus(error?.message || '保存顺序失败，请稍后重试', 'error');
+        } finally {
+            this.busy = false;
+            this.render(this.orders.get(this.currentOrderId));
         }
-        this.setStatus('队列顺序已保存', 'success');
     }
 
     cancelDraft() {

@@ -1,5 +1,5 @@
-import publicMethod from "../../utils/common.js?v=20260812-5";
-import { mergeTranslation, parseLrc } from "../lyric-parser.mjs";
+import publicMethod from "../../utils/common.js?v=20260917-1";
+import { normalizeLyrics } from "../lyric-parser.mjs";
 
 class WyMusicServer {
 
@@ -317,16 +317,12 @@ class WyMusicServer {
         const translation = data.tlyric?.lyric || '';
         const romanization = data.romalrc?.lyric || '';
         const noLyrics = Boolean(data.nolyric || data.uncollected || (!original && !translation));
-        return {
-            platform: 'wy',
-            songId: String(songId),
-            original,
-            translation,
+        return normalizeLyrics(original, translation, {
+            songId,
             romanization,
             instrumental: Boolean(data.nolyric && !original),
-            noLyrics,
-            lines: noLyrics ? [] : mergeTranslation(parseLrc(original), translation)
-        };
+            noLyrics
+        });
     }
 
     /* 获取歌单列表 

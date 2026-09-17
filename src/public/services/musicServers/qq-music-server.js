@@ -1,4 +1,4 @@
-import publicMethod from "../../utils/common.js?v=20260812-5";
+import publicMethod from "../../utils/common.js?v=20260917-1";
 
 class QQMusicServer {
 

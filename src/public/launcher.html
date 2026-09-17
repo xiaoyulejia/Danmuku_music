@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>点歌台启动器</title>
-    <script src="./version.js?v=20260902-3"></script>
+    <script src="./version.js?v=20260917-1"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -132,6 +132,11 @@
         <button type="submit">生成链接</button>
     </form>
     <div class="scene-options">
+        <label for="danmuMode">弹幕获取模式</label>
+        <select id="danmuMode" aria-label="弹幕获取模式">
+            <option value="realtime" selected>实时 WebSocket（默认）</option>
+            <option value="history">历史 10 条轮询</option>
+        </select>
         <label for="sceneCount">生成多场景链接</label>
         <select id="sceneCount" aria-label="生成多场景链接数量">
             <option value="1" selected>1 个场景（scene-a）</option>
@@ -195,6 +200,7 @@
     const roomInput = document.getElementById('roomId');
     const error = document.getElementById('error');
     const links = document.getElementById('links');
+    const danmuModeInput = document.getElementById('danmuMode');
     const sceneCountInput = document.getElementById('sceneCount');
     const sceneLinks = document.getElementById('sceneLinks');
     const sceneLinkList = document.getElementById('sceneLinkList');
@@ -205,6 +211,16 @@
     document.getElementById('productVersion').textContent = window.__DAMUKU_PRODUCT_VERSION || '未知';
     document.getElementById('frontendBuildId').textContent = window.__DAMUKU_FRONTEND_BUILD_ID || '未知';
     document.getElementById('serverBuildId').textContent = launchParams.get('server_version') || '未提供';
+
+    const isEnabledFlag = value => ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase());
+    if (isEnabledFlag(launchParams.get('history'))) danmuModeInput.value = 'history';
+    else danmuModeInput.value = 'realtime';
+
+    function selectedModeQuery() {
+        return danmuModeInput.value === 'history'
+            ? { history: '1' }
+            : { realtime: '1' };
+    }
 
     function buildUrl(query) {
         const base = new URL(location.href);
@@ -240,7 +256,7 @@
         return card;
     }
 
-    function renderSceneLinks(roomId, count) {
+    function renderSceneLinks(roomId, count, modeQuery = selectedModeQuery()) {
         sceneLinkList.replaceChildren();
         for (let index = 0; index < count; index += 1) {
             const sceneName = `scene-${String.fromCharCode(97 + index)}`;
@@ -248,7 +264,8 @@
                 roomid: roomId,
                 source: 'obs',
                 handoff: 'scene',
-                instance: sceneName
+                instance: sceneName,
+                ...modeQuery
             });
             sceneLinkList.appendChild(createLinkCard(
                 `OBS 场景 ${sceneName.slice(-1).toUpperCase()}`,
@@ -260,12 +277,15 @@
     }
 
     function renderLinks(roomId) {
-        const obsUrl = buildUrl({ roomid: roomId, source: 'obs' });
-        const controlUrl = buildUrl({ roomid: roomId, livemode: 'false', source: 'control' });
-        const lyricUrl = buildUrl({ roomid: roomId, source: 'obs', lyric: 'true' });
+        const modeQuery = selectedModeQuery();
+        const obsUrl = buildUrl({ roomid: roomId, source: 'obs', ...modeQuery });
+        const controlUrl = buildUrl({ roomid: roomId, livemode: 'false', source: 'control', ...modeQuery });
+        const lyricUrl = buildUrl({ roomid: roomId, source: 'obs', lyric: 'true', ...modeQuery });
         const settingsBase = new URL(location.href);
         if (settingsBase.hostname === 'localhost') settingsBase.hostname = '127.0.0.1';
-        const settingsUrl = new URL(`./settings.html?roomid=${encodeURIComponent(roomId)}`, settingsBase.href).href;
+        const settingsUrlObject = new URL('./settings.html', settingsBase.href);
+        settingsUrlObject.search = new URLSearchParams({ roomid: roomId, ...modeQuery }).toString();
+        const settingsUrl = settingsUrlObject.href;
         const obsLink = document.getElementById('obsLink');
         const controlLink = document.getElementById('controlLink');
         obsLink.href = obsUrl;
@@ -275,10 +295,10 @@
         const lyricLink = document.getElementById('lyricLink');
         lyricLink.href = lyricUrl;
         lyricLink.textContent = lyricUrl;
-        renderSceneLinks(roomId, Math.min(10, Math.max(1, Number(sceneCountInput.value) || 1)));
+        renderSceneLinks(roomId, Math.min(10, Math.max(1, Number(sceneCountInput.value) || 1)), modeQuery);
         document.getElementById('settingsLink').href = settingsUrl;
         links.hidden = false;
-        history.replaceState(null, '', `?roomid=${encodeURIComponent(roomId)}`);
+        history.replaceState(null, '', `?${new URLSearchParams({ roomid: roomId, ...modeQuery }).toString()}`);
     }
 
     form.addEventListener('submit', event => {
@@ -300,6 +320,11 @@
         if (/^[1-9]\d*$/.test(roomId) && !links.hidden) {
             renderSceneLinks(roomId, Math.min(10, Math.max(1, Number(sceneCountInput.value) || 1)));
         }
+    });
+
+    danmuModeInput.addEventListener('change', () => {
+        const roomId = roomInput.value.trim();
+        if (/^[1-9]\d*$/.test(roomId) && !links.hidden) renderLinks(roomId);
     });
 
     document.addEventListener('click', async event => {

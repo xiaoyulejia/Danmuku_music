@@ -8,7 +8,21 @@ $ErrorActionPreference = 'Stop'
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path.TrimEnd('\')
 $configPath = Join-Path $projectRoot 'config\config.yaml'
+$webApiPath = Join-Path $projectRoot 'config\webapi.js'
+$defaultWebApiPath = Join-Path $projectRoot 'config\default\webapi.js'
 $port = 8000
+$basePath = '/order'
+
+foreach ($candidatePath in @($webApiPath, $defaultWebApiPath)) {
+    if (-not (Test-Path -LiteralPath $candidatePath)) { continue }
+    $basePathLine = Select-String -LiteralPath $candidatePath -Pattern '^\s*BASE_PATH\s*:\s*["'']([^"'']+)["'']' | Select-Object -First 1
+    if ($null -ne $basePathLine -and $basePathLine.Matches.Count -gt 0) {
+        $basePath = [string]$basePathLine.Matches[0].Groups[1].Value
+        break
+    }
+}
+$basePath = '/' + ($basePath.Trim('/') -replace '/+', '/')
+if ($basePath -eq '/') { $basePath = '' }
 
 if (Test-Path -LiteralPath $configPath) {
     $portLine = Select-String -LiteralPath $configPath -Pattern '^\s*web_server_port\s*:\s*(\d+)' | Select-Object -First 1
@@ -50,7 +64,7 @@ function Get-ProjectPortProcesses {
 
         $isProjectService = $false
         try {
-            $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port/order/launcher.html" -UseBasicParsing -TimeoutSec 2
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port$basePath/launcher.html" -UseBasicParsing -TimeoutSec 2
             $isProjectService = ($response.StatusCode -ge 200) -and ($response.StatusCode -lt 400) -and
                 ($response.Content -match 'id="roomForm"|id="obsLink"')
         } catch {

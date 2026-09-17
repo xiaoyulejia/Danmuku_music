@@ -9,7 +9,8 @@
         button, input { font: inherit; padding: 6px 10px; }
         button { cursor: pointer; }
         .status { margin: 14px 0; padding: 10px; background: #f3f5f7; border-radius: 6px; white-space: pre-wrap; }
-        table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+        .tableWrap { overflow-x: auto; margin-top: 16px; }
+        table { border-collapse: collapse; width: 100%; min-width: 640px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #f5f5f5; }
         .new { background: #e8fff0; }
@@ -26,10 +27,12 @@
         <button id="stop">停止</button>
     </p>
     <div id="status" class="status">等待开始</div>
-    <table>
-        <thead><tr><th>时间</th><th>UID</th><th>用户名</th><th>弹幕</th><th>ID</th></tr></thead>
-        <tbody id="messages"></tbody>
-    </table>
+    <div class="tableWrap">
+        <table>
+            <thead><tr><th>时间</th><th>UID</th><th>用户名</th><th>弹幕</th><th>ID</th></tr></thead>
+            <tbody id="messages"></tbody>
+        </table>
+    </div>
 
     <script>
         const config = window.location;

@@ -1,7 +1,7 @@
-import orderConfiger from "./order-configer.js?v=20260810-41";
-import publicMethod from "../utils/common.js?v=20260810-41";
-import musicServer from "../services/musicServers/music-server.js?v=20260812-22";
-import lyricService from "../services/lyric-service.js?v=20260815-2";
+import orderConfiger from "./order-configer.js?v=20260917-1";
+import publicMethod from "../utils/common.js?v=20260917-1";
+import musicServer from "../services/musicServers/music-server.js?v=20260917-1";
+import lyricService from "../services/lyric-service.js?v=20260917-1";
 
 /**
  * 音乐播放器
@@ -1116,6 +1116,10 @@ class MusicPlayer {
             });
             const result = await response.json();
             if (result.code !== 0 || !result.data?.hasNeteaseCookie) return false;
+            const cookie = result.data?.netease_cookie;
+            if (typeof cookie === 'string' && cookie.trim()) {
+                musicServer.getServer('wy').cookie = cookie;
+            }
             this.debugLog('已接收共享网易云登录态', { hasCookie: true });
             return true;
         } catch (error) {
@@ -1163,13 +1167,13 @@ class MusicPlayer {
         if (canonicalState) this.applySharedState(canonicalState);
         if (this.isMirrorMode) return;
         if (['next', 'addOrder', 'loadSongList', 'play'].includes(message.command)) {
-            this.playCanonicalState(canonicalState, message.command);
+            await this.playCanonicalState(canonicalState, message.command);
         }
         if (message.command === 'toggle') {
             if (!this.audio.src && canonicalState?.currentSong) {
-                this.playCanonicalState(canonicalState, 'toggle');
+                await this.playCanonicalState(canonicalState, 'toggle');
             } else if (this.audio.paused) {
-                this.unlockPlayback();
+                await this.unlockPlayback();
             } else {
                 this.audio.pause();
             }
@@ -1621,10 +1625,10 @@ class MusicPlayer {
         }
     }
 
-    sendCommand(command, value) {
+    sendCommand(command, value, options = {}) {
         const message = {
             type: 'command',
-            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            id: String(options.id || '').trim() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             command,
             value
         };
@@ -2017,9 +2021,9 @@ class MusicPlayer {
     }
 
     // 用户手动点击后解锁浏览器音频策略，并尝试恢复当前歌曲
-    async unlockPlayback() {
+    async unlockPlayback(options = {}) {
         if (this.isMirrorMode) {
-            this.sendCommand('unlockAudio');
+            this.sendCommand('unlockAudio', undefined, options);
             publicMethod.pageAlert("已发送 OBS 播放页声音指令");
             return;
         }
@@ -2070,9 +2074,9 @@ class MusicPlayer {
         }
     }
 
-    pausePlayback() {
+    pausePlayback(options = {}) {
         if (this.isMirrorMode) {
-            this.sendCommand('pause');
+            this.sendCommand('pause', undefined, options);
             return;
         }
         if (!this.audio.paused) this.audio.pause();
@@ -2196,11 +2200,11 @@ class MusicPlayer {
     }
 
     // 播放下一首
-    async playNext() {
-        return this.sendCommand('next');
+    async playNext(options = {}) {
+        return this.sendCommand('next', undefined, options);
     }
 
-    async requestNext(user = null) {
+    async requestNext(user = null, options = {}) {
         const current = this.orderList[0];
         if (!current) {
             publicMethod.pageAlert('当前没有可切换的歌曲');
@@ -2210,7 +2214,7 @@ class MusicPlayer {
             publicMethod.pageAlert('不能切别人点的歌哦(^o^)');
             return { ok: false, reason: 'not-owner' };
         }
-        return this.playNext();
+        return this.playNext(options);
     }
 
     // 检查并执行待处理的切歌请求
@@ -2226,12 +2230,14 @@ class MusicPlayer {
     }
 
     // 添加点歌对象
-    async addOrder(order) {
+    async addOrder(order, options = {}) {
         // 检查点歌信息
         if (!this.checkOrder(order)) {
             return false;
         }
-        const result = await this.sendCommand('addOrder', order);
+        const result = await this.sendCommand('addOrder', order, {
+            id: options.commandId
+        });
         if (!result?.ok) {
             publicMethod.pageAlert(result?.result?.result?.reason || '点歌被后端拒绝');
             return false;
@@ -2282,8 +2288,9 @@ class MusicPlayer {
             }
         }
 
-        // 判断该歌曲是否已在点歌列表
-        if (this.orderList.some(value => value.song.sid == order.song.sid)) {
+        // 判断该歌曲是否已在点歌列表；平台也属于歌曲身份，避免误拦截同 SID 的跨平台歌曲。
+        const incomingSongKey = this.songKey(order.song);
+        if (incomingSongKey && this.orderList.some(value => this.songKey(value.song) === incomingSongKey)) {
             publicMethod.pageAlert("已经点上啦!>_<!");
             return false;
         }

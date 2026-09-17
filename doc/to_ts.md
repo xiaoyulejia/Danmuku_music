@@ -24,7 +24,7 @@
 - 静态资源：由 Express 直接提供 `src/public`。
 - 测试：Node.js 内置测试运行器，命令为 `npm test`。
 - 启动：开发环境执行 `node app.js`，生产环境由 PM2 执行 `app.js`。
-- 当前没有 TypeScript、构建器、打包器或 lint 流程。
+- 当前已引入 TypeScript 类型声明、分离的客户端/服务端 tsconfig 和基础 build scripts；主要运行代码仍是 JavaScript，且生产入口目前仍直接运行源码 `app.js`。
 
 迁移前先保存以下基线结果：
 
@@ -230,6 +230,7 @@ npm install --save-dev typescript @types/node @types/express @types/ws
 - `npm run build:client`
 - `npm run build`
 - `npm run clean`
+- 当前仓库尚未完成“生产入口切换到 dist”；以下 dist 启动验收属于迁移目标，不能当作现状描述。
 - 编译结果写入 `dist`。
 - HTML、CSS、图片和必要配置脚本被复制到对应静态目录。
 - 开发命令可以监听源码变化，但生产命令必须运行 `dist` 中的 JavaScript。

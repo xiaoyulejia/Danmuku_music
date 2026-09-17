@@ -7,17 +7,17 @@ function toFiniteNumber(value, fallback = 0) {
 }
 
 function parseTimestamp(value) {
-    const match = String(value || '').trim().match(/^(\d+):(\d{1,2})(?:\.(\d{1,3}))?$/);
+    const match = String(value ?? '').trim().match(/^(\d+):(\d{1,2})(?:\.(\d{1,3}))?$/);
     if (!match) return null;
     const minutes = Number(match[1]);
     const seconds = Number(match[2]);
     if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || seconds >= 60) return null;
-    const fraction = (match[3] || '').padEnd(3, '0');
+    const fraction = (match[3] ?? '').padEnd(3, '0');
     return Math.max(0, minutes * 60_000 + seconds * 1_000 + Number(fraction || 0));
 }
 
 export function parseLrc(text) {
-    const source = String(text || '').replace(/^\uFEFF/, '');
+    const source = String(text ?? '').replace(/^\uFEFF/, '');
     let offsetMs = 0;
     const entries = [];
     source.split(/\r?\n/).forEach((line, lineIndex) => {
@@ -90,17 +90,20 @@ export function findLineIndex(lines, timeMs) {
         }
     }
     if (candidate < 0) return -1;
-    return target < Number(lines[candidate]?.endMs ?? Infinity) ? candidate : candidate;
+    return candidate;
 }
 
 export function normalizeLyrics(original, translation = '', meta = {}) {
-    const lines = parseLrc(original);
+    const originalLines = parseLrc(original);
+    const lines = originalLines.length
+        ? originalLines
+        : parseLrc(translation).map(line => ({ ...line, text: '', translation: line.text }));
     return {
         platform: 'wy',
-        songId: String(meta.songId || ''),
-        original: String(original || ''),
-        translation: String(translation || ''),
-        romanization: String(meta.romanization || ''),
+        songId: String(meta.songId ?? ''),
+        original: String(original ?? ''),
+        translation: String(translation ?? ''),
+        romanization: String(meta.romanization ?? ''),
         instrumental: Boolean(meta.instrumental),
         noLyrics: Boolean(meta.noLyrics || (!lines.length && !meta.instrumental)),
         lines: mergeTranslation(lines, translation)

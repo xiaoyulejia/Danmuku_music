@@ -101,11 +101,14 @@ export function findLineIndex(lines: LyricLine[], timeMs: unknown): number {
     }
   }
   if (candidate < 0) return -1;
-  return target < Number(lines[candidate]?.endMs ?? Infinity) ? candidate : candidate;
+  return candidate;
 }
 
 export function normalizeLyrics(original: unknown, translation: unknown = '', meta: LyricMeta = {}): LyricResult {
-  const lines = parseLrc(original);
+  const originalLines = parseLrc(original);
+  const lines = originalLines.length
+    ? originalLines
+    : parseLrc(translation).map(line => ({ ...line, text: '', translation: line.text }));
   return {
     platform: 'wy' as MusicPlatform,
     songId: String(meta.songId ?? ''),

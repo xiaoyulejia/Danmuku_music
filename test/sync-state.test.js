@@ -97,6 +97,130 @@ test('sync-command rejects untrusted origins and deduplicates command ids', asyn
     }
 });
 
+test('sync-state cannot overwrite a concurrent danmu addOrder', async () => {
+    const roomId = `typecheck-${Date.now()}-danmu-race`;
+    const { server, base } = await createServer();
+    try {
+        const headers = { 'content-type': 'application/json' };
+        const addOrder = fetch(`${base}/live/sync-command`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                room_id: roomId,
+                command: {
+                    id: 'danmu-race-order',
+                    command: 'addOrder',
+                    value: {
+                        uid: 123,
+                        uname: '弹幕用户',
+                        song: { platform: 'wy', sid: 'danmu-song', sname: '弹幕歌曲', sartist: '歌手', duration: 120 }
+                    }
+                }
+            })
+        });
+        const publishState = fetch(`${base}/live/sync-state`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                room_id: roomId,
+                state: { queue: [], status: '等待点歌', volume: 50, updatedAt: Date.now() }
+            })
+        });
+        const [commandResponse, stateResponse] = await Promise.all([addOrder, publishState]);
+        assert.equal(commandResponse.status, 200);
+        assert.equal(stateResponse.status, 200);
+
+        const snapshot = await fetch(`${base}/live/sync-state?room_id=${roomId}`).then(response => response.json());
+        assert.equal(snapshot.data.queue.length, 1);
+        assert.equal(snapshot.data.queue[0].song.sid, 'danmu-song');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+        cleanupRoom(roomId);
+    }
+});
+
+test('sync-state normalizes invalid idle indexes and can advance the idle queue', async () => {
+    const roomId = `typecheck-${Date.now()}-idle-index`;
+    const { server, base } = await createServer();
+    try {
+        const response = await fetch(`${base}/live/sync-state`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                room_id: roomId,
+                state: {
+                    queue: [],
+                    idleSongList: [{ platform: 'wy', sid: 'idle-1', sname: '空闲歌曲', sartist: '歌手', duration: 120 }],
+                    idleIndex: 'not-a-number'
+                }
+            })
+        });
+        const body = await response.json();
+        assert.equal(response.status, 200);
+        assert.equal(body.data.idleIndex, -1);
+
+        const next = await fetch(`${base}/live/sync-command`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                room_id: roomId,
+                command: { id: 'idle-next', command: 'next' }
+            })
+        });
+        const nextBody = await next.json();
+        assert.equal(next.status, 200);
+        assert.equal(nextBody.data.currentSong.sid, 'idle-1');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+        cleanupRoom(roomId);
+    }
+});
+
+test('sync-command treats platform as part of the duplicate song key', async () => {
+    const roomId = `typecheck-${Date.now()}-platform-duplicate`;
+    const { server, base } = await createServer();
+    try {
+        const add = (id, platform) => fetch(`${base}/live/sync-command`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                room_id: roomId,
+                command: {
+                    id,
+                    command: 'addOrder',
+                    value: { uid: 1, uname: 'tester', song: { platform, sid: 'same-id', sname: platform, sartist: '歌手', duration: 120 } }
+                }
+            })
+        });
+        const first = await add('wy-order', 'wy');
+        const second = await add('qq-order', 'qq');
+        assert.equal((await first.json()).result.accepted, true);
+        assert.equal((await second.json()).result.accepted, true);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+        cleanupRoom(roomId);
+    }
+});
+
+test('sync-credentials CORS preflight allows DELETE', async () => {
+    const roomId = `typecheck-${Date.now()}-cors-delete`;
+    const { server, base } = await createServer();
+    try {
+        const response = await fetch(`${base}/live/sync-credentials`, {
+            method: 'OPTIONS',
+            headers: {
+                origin: 'http://127.0.0.1:4173',
+                'access-control-request-method': 'DELETE'
+            }
+        });
+        assert.equal(response.status, 204);
+        assert.match(response.headers.get('access-control-allow-methods') || '', /DELETE/);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+        cleanupRoom(roomId);
+    }
+});
+
 test('queue manager manual orders bypass per-user cap but keep canonical metadata', async () => {
     const roomId = `typecheck-${Date.now()}-manual`;
     const { server, base } = await createServer();

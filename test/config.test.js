@@ -3,7 +3,7 @@ const test = require('node:test');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { resolvePort, loadRuntimeConfig } = require('../src/config');
+const { resolvePort, loadRuntimeConfig, normalizeBasePath } = require('../src/config');
 const { LocalStore, mergeSettings } = require('../src/services/local-store');
 
 test('uses default port when values are missing', () => {
@@ -74,6 +74,13 @@ test('multi-scene auto settings default safely and clamp the heartbeat threshold
         multiSceneAutoSwitchEnabled: true
     } }).display;
     assert.strictEqual(disabled.multiSceneAutoSwitchEnabled, false);
+});
+
+test('normalizes custom base paths consistently', () => {
+    assert.strictEqual(normalizeBasePath(undefined), '/order');
+    assert.strictEqual(normalizeBasePath('/'), '');
+    assert.strictEqual(normalizeBasePath('///music///'), '/music');
+    assert.strictEqual(normalizeBasePath('  /music/  '), '/music');
 });
 
 test('display appearance settings are validated and clamped', () => {

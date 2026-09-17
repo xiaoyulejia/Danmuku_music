@@ -1,6 +1,8 @@
 /* 公用函数 */
 export default class PublicMethod {
 
+    static repeatAlertTimers = new Map();
+
     // 统一解析集成挂载路径和外部 API 地址。
     static resolveApiBase(apiAddress, basePath = window.API_CONFIG?.BASE_PATH || '') {
         const address = String(apiAddress || '').trim();
@@ -46,9 +48,26 @@ export default class PublicMethod {
 
     // 页面提示循环输出
     static pageAlertRepeat(str) {
-        setInterval(() => {
+        const key = String(str || '');
+        if (this.repeatAlertTimers.has(key)) return this.repeatAlertTimers.get(key);
+        const timer = setInterval(() => {
             PublicMethod.pageAlert(str);
-        }, 7000)
+        }, 7000);
+        this.repeatAlertTimers.set(key, timer);
+        return timer;
+    }
+
+    static stopPageAlertRepeat(str) {
+        const key = String(str || '');
+        const timer = this.repeatAlertTimers.get(key);
+        if (!timer) return;
+        clearInterval(timer);
+        this.repeatAlertTimers.delete(key);
+    }
+
+    static stopAllPageAlertRepeats() {
+        for (const timer of this.repeatAlertTimers.values()) clearInterval(timer);
+        this.repeatAlertTimers.clear();
     }
 
     // 洗牌算法

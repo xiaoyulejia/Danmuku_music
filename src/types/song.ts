@@ -31,8 +31,9 @@ export interface LyricResult {
 }
 
 export interface MusicServer {
-  search(query: string, options?: unknown): Promise<unknown>;
-  getSong(songId: SongId, options?: unknown): Promise<Song>;
-  getUrl(songId: SongId, options?: unknown): Promise<string>;
-  getLyrics(songId: SongId, options?: { signal?: AbortSignal }): Promise<LyricResult>;
+  searchSongs(keyword: string, limit?: number): Promise<Song[]>;
+  getSongInfo(keyword: string): Promise<Song | null>;
+  getSongUrl(songId: SongId): Promise<string | null>;
+  getLyrics?(songId: SongId, options?: { signal?: AbortSignal }): Promise<LyricResult>;
+  getSongList?(listId: string): Promise<Song[]>;
 }

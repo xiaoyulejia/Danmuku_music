@@ -26,7 +26,11 @@ where npm >nul 2>nul
 if errorlevel 1 goto :npm_missing
 
 echo 已检测到 Node.js !NODE_MAJOR! 和 npm。
-if not exist "node_modules\express\package.json" (
+set "NEEDS_INSTALL="
+for %%P in (axios express NeteaseCloudMusicApi pm2 ws yaml) do (
+    if not exist "node_modules\%%P\package.json" set "NEEDS_INSTALL=1"
+)
+if defined NEEDS_INSTALL (
     echo 首次运行，使用国内镜像安装依赖：%NPM_MIRROR%
     call npm.cmd install --registry=%NPM_MIRROR%
     if errorlevel 1 (

@@ -1,9 +1,9 @@
-import musicPlayer from './components/music-player.js?v=20260831-7';
-import './components/queue-manager.js?v=20260902-3';
-import orderConfiger from './components/order-configer.js?v=20260810-41';
-import loginConfiger from './components/login-configer.js?v=20260810-42'
-import danmuConfiger from './components/danmu-configer.js?v=20260816-1';
-import publicMethod from './utils/common.js?v=20260810-41';
+import musicPlayer from './components/music-player.js?v=20260917-1';
+import './components/queue-manager.js?v=20260917-1';
+import orderConfiger from './components/order-configer.js?v=20260917-1';
+import loginConfiger from './components/login-configer.js?v=20260917-1'
+import danmuConfiger from './components/danmu-configer.js?v=20260917-1';
+import publicMethod from './utils/common.js?v=20260917-1';
 
 const FRONTEND_BUILD_ID = window.__DAMUKU_FRONTEND_BUILD_ID || '';
 window.__DAMUKU_FRONTEND_BUILD_ID = FRONTEND_BUILD_ID;
@@ -652,8 +652,7 @@ async function initializeMainPage() {
     // 会在这里已经降级成监控端，不会再各自加载一份空闲歌单。
     await musicPlayer.ready;
     const playbackMode = !settingsOnly && !musicPlayer.isMirrorMode;
-    const debugObserver = !settingsOnly && musicPlayer.isMirrorMode &&
-        ['1', 'true', 'yes', 'on'].includes((pageParams.get('debug') || '').toLowerCase());
+    const mirrorDanmuMode = !settingsOnly && musicPlayer.isMirrorMode && !lyricOnlyMode;
     liveMode = obsDisplayMode;
     applyAppearance();
     let playbackStarted = false;
@@ -667,10 +666,9 @@ async function initializeMainPage() {
     };
     window.addEventListener('bilibili-ordersong-publisher-claimed', startPlaybackServices);
     if (playbackMode) startPlaybackServices();
-    // 控制/镜像页通常不连接弹幕。debug=1 时建立只读诊断连接：
-    // 默认观察旧版历史轮询，追加 realtime=1 时观察 WebSocket；不注册点歌回调，
-    // 避免和 OBS 播放页重复点歌。
-    if (debugObserver) danmuConfiger.startDanmu({ processCommands: false });
+    // 所有非设置、非歌词镜像页都连接弹幕并处理命令；debug 只控制日志，
+    // 不再决定是否能够点歌。命令使用稳定 ID 做跨页面幂等。
+    if (mirrorDanmuMode) danmuConfiger.startDanmu({ processCommands: true });
     if (!settingsOnly && !playbackMode) musicPlayer.requestSharedState();
 
     const sceneHandoffPanel = document.getElementById('sceneHandoffPanel');

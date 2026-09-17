@@ -291,7 +291,7 @@ body:not(.settingsOnly) .setting table tr td select:hover{
 
 /* -------------- 点歌设置页样式 ------------ */
 .setting_order_page #userBlackList,
-#songBlackList {
+.setting_order_page #songBlackList {
     height: 105px;
     background: rgb(16, 20, 16);
     transition: .5s;
@@ -313,11 +313,13 @@ body:not(.settingsOnly) .setting table tr td select:hover{
     justify-content: flex-start;
     gap: 4px;
     padding: 14px 14px 12px;
+    overflow-x: auto;
     border-bottom: 1px solid rgba(255, 255, 255, .1);
     background: rgba(255, 255, 255, .035);
 }
 
 .settingsOnly .setting_btn {
+    flex: 0 0 auto;
     height: 36px;
     margin: 0;
     padding: 0 10px;
@@ -344,7 +346,7 @@ body:not(.settingsOnly) .setting table tr td select:hover{
     width: 100%;
     height: auto;
     padding: 0 0 22px;
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: auto;
 }
 
@@ -572,10 +574,14 @@ body:not(.settingsOnly) .setting table tr td select:hover{
     transform: translateY(-1px);
 }
 
+.settingsOnly .setting input:focus-visible,
+.settingsOnly .setting select:focus-visible,
+.settingsOnly .setting textarea:focus-visible,
+.settingsOnly .setting .setting_btn:focus-visible,
 .settingsOnly .setting button:not(.setting_btn):not(#upBtn):focus-visible {
-    border-color: rgba(152, 136, 255, .48);
-    outline: none;
-    box-shadow: 0 5px 14px rgba(55, 43, 132, .16);
+    outline: 2px solid #b9adff !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(185, 173, 255, .28) !important;
 }
 
 .settingsOnly .setting button:not(.setting_btn):not(#upBtn):disabled {

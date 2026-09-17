@@ -1,4 +1,4 @@
-import publicMethod from "../../utils/common.js?v=20260810-13";
+import publicMethod from "../../utils/common.js?v=20260917-1";
 
 /** 使用普通B站直播协议接收弹幕，不再调用直播开放平台 gameStart。 */
 export default class BilibiliServer {
@@ -66,6 +66,7 @@ export default class BilibiliServer {
 
     openSocket() {
         this.webSocket.onopen = () => {
+            publicMethod.stopAllPageAlertRepeats();
             publicMethod.pageAlert("B站弹幕服务器连接已打开!");
             this.debugLog('WebSocket 已连接');
         };
@@ -157,7 +158,11 @@ export default class BilibiliServer {
                 });
                 if (response.data?.data?._room_id) this.roomId = Number(response.data.data._room_id);
                 const items = response.data?.data?.room || [];
-                const keyOf = item => item.id_str || [item.uid, item.timeline, item.text].join('|');
+                const keyOf = item => item.id_str || item.id || item.rnd || item.timestamp || [
+                    item.uid || item.user?.uid || 0,
+                    item.timeline || '',
+                    item.text || ''
+                ].join('|');
                 const freshItems = items.filter(item => !this.historySeen.has(keyOf(item)));
                 items.forEach(item => this.historySeen.add(keyOf(item)));
                 if (!this.historyInitialized) {
@@ -174,10 +179,18 @@ export default class BilibiliServer {
                     console.log(`[BilibiliDanmu][history] 发现 ${rows.length} 条更新弹幕`);
                     console.table(rows);
                     for (const item of freshItems) {
+                        const uid = item.uid || item.user?.uid || 0;
+                        const sentAt = item.timeline ? Date.parse(String(item.timeline).replace(/-/g, '/')) : 0;
+                        const fingerprint = keyOf(item);
                         if (this.danmuMessage) this.danmuMessage({
-                            uid: item.uid || item.user?.uid || 0,
+                            uid,
                             uname: item.user?.base?.name || item.uname || item.nickname || '用户',
-                            danmu: item.text || ''
+                            danmu: item.text || '',
+                            roomId: this.roomId,
+                            messageId: item.id_str || item.id || '',
+                            sentAt: Number.isFinite(sentAt) ? sentAt : 0,
+                            fingerprint,
+                            source: 'history'
                         });
                     }
                 }
@@ -206,6 +219,7 @@ export default class BilibiliServer {
 
     close() {
         this.closing = true;
+        publicMethod.stopAllPageAlertRepeats();
         this.stopHistoryConsole();
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;

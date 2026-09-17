@@ -265,6 +265,8 @@ function normalizeRoomState(input = {}) {
     const generation = Math.max(0, Number(sourcePublisher.generation ?? input.publisherGeneration) || 0);
     const leaseToken = String(sourcePublisher.leaseToken || input.publisherLeaseToken || '');
     const heartbeatAt = Number(sourcePublisher.heartbeatAt || input.publisherHeartbeatAt || 0) || 0;
+    const rawIdleIndex = input.idleIndex == null || input.idleIndex === '' ? NaN : Number(input.idleIndex);
+    const normalizedIdleIndex = Number.isFinite(rawIdleIndex) ? Math.trunc(rawIdleIndex) : -1;
     return {
         ...defaults,
         ...input,
@@ -288,7 +290,7 @@ function normalizeRoomState(input = {}) {
         idleIndex: idleSongList.length
             ? Math.max(-1, Math.min(
                 idleSongList.length - 1,
-                input.idleIndex == null ? -1 : Number(input.idleIndex)
+                normalizedIdleIndex
             ))
             : -1,
         idleSongCount: idleSongList.length,
@@ -787,9 +789,12 @@ function expireHandoff(roomId, state) {
 
 function appendNextIdleSong(state) {
     if (!state.idleSongList.length) return null;
-    state.idleIndex = (state.idleIndex + 1) % state.idleSongList.length;
+    const currentIndex = Number.isInteger(state.idleIndex) ? state.idleIndex : -1;
+    state.idleIndex = (currentIndex + 1) % state.idleSongList.length;
+    const idleSong = state.idleSongList[state.idleIndex];
+    if (!idleSong) return null;
     const order = normalizeOrder({
-        ...state.idleSongList[state.idleIndex],
+        ...idleSong,
         orderId: createOrderId(),
         source: 'idle',
         requestedAt: Date.now()
@@ -925,7 +930,7 @@ function applyRoomCommand(roomId, command) {
                 result = { accepted: false, command: command.command, reason: '用户或歌曲在黑名单中' };
                 break;
             }
-            if (state.queue.some(item => item.song.sid === order.song.sid)) {
+            if (state.queue.some(item => songKey(item.song) === songKey(order.song))) {
                 result = { accepted: false, command: command.command, reason: '歌曲已在点歌列表中' };
                 break;
             }
@@ -1141,7 +1146,7 @@ function applyRoomCommand(roomId, command) {
 router.use((req, res, next) => {
     if (req.path.startsWith('/live/')) {
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         if (req.method === 'OPTIONS') return res.sendStatus(204);
     }
@@ -1249,7 +1254,7 @@ router.put('/live/settings', (req, res) => {
 router.get('/live/sync-credentials', (req, res) => {
     const roomId = String(req.query.room_id || req.query.roomid || 'default');
     const cookie = sharedRuntimeCredentials.get(roomId) || localStore.getNeteaseCookie();
-    res.json({ code: 0, data: { hasNeteaseCookie: Boolean(cookie) } });
+    res.json({ code: 0, data: { hasNeteaseCookie: Boolean(cookie), netease_cookie: cookie || '' } });
 });
 
 router.post('/live/sync-credentials', (req, res) => {
@@ -1608,12 +1613,14 @@ router.post('/live/sync-claim', (req, res) => {
     res.json({ code: 0, data: nextState, claimed: true, generation, leaseToken, switchId: targetClaimAllowed ? switchId : '' });
 });
 
-router.post('/live/sync-state', (req, res) => {
+router.post('/live/sync-state', async (req, res) => {
     const roomId = String(req.body?.room_id || req.body?.roomid || 'default');
     const state = req.body?.state;
     if (!state || typeof state !== 'object') {
         return res.status(400).json({ code: -1, message: 'state必须是对象' });
     }
+    try {
+        return await withRoomLock(roomId, async () => {
     const current = readRoomState(roomId);
     const incomingPublisherId = String(state.publisherId || '');
     const currentPublisher = currentPublisherInfo(current);
@@ -1668,12 +1675,19 @@ router.post('/live/sync-state', (req, res) => {
         nextState.songListId = String(nextState.settings.login.songListId);
     }
     const persisted = persistRoomState(roomId, nextState);
-    res.json({ code: 0, data: persisted });
+            return res.json({ code: 0, data: persisted });
+        });
+    } catch (error) {
+        console.error('[OrderSong][sync-state] failed', { roomId, message: error.message });
+        return res.status(500).json({ code: -1, reason: 'sync-state-failed', message: error.message });
+    }
 });
 
 // 场景隐藏/页面卸载时主动交出播放端，保留歌曲、队列和歌词引用。
-router.post('/live/sync-release', (req, res) => {
+router.post('/live/sync-release', async (req, res) => {
     const roomId = String(req.body?.room_id || req.body?.roomid || 'default');
+    try {
+        return await withRoomLock(roomId, async () => {
     const current = readRoomState(roomId);
     const auth = publisherAuthResult(current, requestPublisherInfo(req.body), { allowLegacy: false });
     if (!auth.ok) return res.status(409).json({ code: -1, data: current, released: false, reason: auth.reason });
@@ -1690,7 +1704,12 @@ router.post('/live/sync-release', (req, res) => {
         handoff: current.handoff
     };
     const persisted = persistRoomState(roomId, next);
-    res.json({ code: 0, data: persisted, released: true });
+            return res.json({ code: 0, data: persisted, released: true });
+        });
+    } catch (error) {
+        console.error('[OrderSong][sync-release] failed', { roomId, message: error.message });
+        return res.status(500).json({ code: -1, reason: 'sync-release-failed', message: error.message });
+    }
 });
 
 router.get('/live/sync-lyrics', (req, res) => {
@@ -1726,14 +1745,13 @@ router.post('/live/sync-lyrics', (req, res) => {
     res.json({ code: 0, data: snapshot, state: persisted });
 });
 
-router.post('/live/sync-command', (req, res) => {
+router.post('/live/sync-command', async (req, res) => {
     const roomId = String(req.body?.room_id || req.body?.roomid || 'default');
     if (!trustedLocalOrigin(req)) return res.status(403).json({ code: -1, reason: 'untrusted-origin' });
     const command = req.body?.command;
     if (!command || typeof command !== 'object') {
         return res.status(400).json({ code: -1, message: 'command必须是对象' });
     }
-    const current = readRoomState(roomId);
     const allowedCommands = new Set([
         'loadSongList', 'addOrder', 'next', 'play', 'volume', 'settings',
         'pause', 'toggle', 'unlockAudio', 'promoteNext', 'reorderQueue', 'removeOrder', 'seek'
@@ -1761,8 +1779,13 @@ router.post('/live/sync-command', (req, res) => {
             return res.status(400).json({ code: -1, message: 'seek参数无效' });
         }
     }
+    try {
+        return await withRoomLock(roomId, async () => {
+            const current = readRoomState(roomId);
     const filePath = commandLogPath(roomId);
-    const list = sharedOrderCommands.get(roomId) || readCommandLog(filePath);
+    // 在房间文件锁内重新读取命令日志，避免多进程实例使用过期内存快照导致
+    // 重复命令未去重或 sequence/队列状态被覆盖。
+    const list = readCommandLog(filePath);
     const commandId = String(command.id || '').trim();
     if (commandId) {
         const duplicate = list.find(item => String(item.id || '') === commandId);
@@ -1844,18 +1867,23 @@ router.post('/live/sync-command', (req, res) => {
     const responseStatus = applied.result.accepted === false
         ? (Number(applied.result.httpStatus) || 400)
         : 200;
-    res.status(responseStatus).json({
-        code: applied.result.accepted === false ? -1 : 0,
-        data: canonicalState,
-        result: applied.result
-    });
+            return res.status(responseStatus).json({
+                code: applied.result.accepted === false ? -1 : 0,
+                data: canonicalState,
+                result: applied.result
+            });
+        });
+    } catch (error) {
+        console.error('[OrderSong][sync-command] failed', { roomId, message: error.message });
+        return res.status(500).json({ code: -1, reason: 'sync-command-failed', message: error.message });
+    }
 });
 
 router.get('/live/sync-commands', (req, res) => {
     const roomId = String(req.query.room_id || req.query.roomid || 'default');
     const after = Number(req.query.after || 0);
     const since = Number(req.query.since || 0);
-    const commands = (sharedOrderCommands.get(roomId) || readCommandLog(commandLogPath(roomId)))
+    const commands = readCommandLog(commandLogPath(roomId))
         .filter(command => command.sequence > after && command.createdAt >= since);
     res.json({ code: 0, data: commands });
 });

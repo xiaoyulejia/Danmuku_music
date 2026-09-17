@@ -1,11 +1,39 @@
-import musicServer from './musicServers/music-server.js?v=20260812-22';
+import musicServer from './musicServers/music-server.js?v=20260917-1';
 import { findLineIndex, mergeTranslation, normalizeLyrics, parseLrc } from './lyric-parser.mjs';
 
 const lyricCache = new Map();
 const lyricInflight = new Map();
+let lyricCacheGeneration = 0;
 const PARSER_VERSION = 1;
 const VALID_TTL = 24 * 60 * 60 * 1000;
 const EMPTY_TTL = 60 * 60 * 1000;
+
+function abortError(signal) {
+    if (signal?.reason instanceof Error) return signal.reason;
+    const error = new Error('歌词请求已取消');
+    error.name = 'AbortError';
+    return error;
+}
+
+function waitForConsumer(request, signal) {
+    if (!signal) return request;
+    if (signal.aborted) return Promise.reject(abortError(signal));
+    return new Promise((resolve, reject) => {
+        const onAbort = () => {
+            cleanup();
+            reject(abortError(signal));
+        };
+        const cleanup = () => signal.removeEventListener('abort', onAbort);
+        signal.addEventListener('abort', onAbort, { once: true });
+        request.then(value => {
+            cleanup();
+            resolve(value);
+        }, error => {
+            cleanup();
+            reject(error);
+        });
+    });
+}
 
 class LyricService {
     key(song) {
@@ -26,24 +54,32 @@ class LyricService {
         }
         let request = lyricInflight.get(key);
         if (!request) {
+            const requestGeneration = lyricCacheGeneration;
             request = (async () => {
-                const value = await musicServer.getServer('wy').getLyrics(song.sid, { signal });
+                const value = await musicServer.getServer('wy').getLyrics(song.sid);
                 const normalized = value?.instrumental
                     ? { ...value, lines: [], status: 'instrumental', parserVersion: PARSER_VERSION }
                     : value?.noLyrics || !value?.lines?.length
                         ? { ...value, lines: [], status: 'empty', parserVersion: PARSER_VERSION }
                         : { ...value, status: 'ready', parserVersion: PARSER_VERSION };
-                lyricCache.set(key, {
-                    fetchedAt: Date.now(),
-                    ttl: normalized.status === 'ready' ? VALID_TTL : EMPTY_TTL,
-                    value: normalized
-                });
+                if (requestGeneration === lyricCacheGeneration) {
+                    lyricCache.set(key, {
+                        fetchedAt: Date.now(),
+                        ttl: normalized.status === 'ready' ? VALID_TTL : EMPTY_TTL,
+                        value: normalized
+                    });
+                }
                 return normalized;
-            })().finally(() => lyricInflight.delete(key));
+            })();
             lyricInflight.set(key, request);
+            request.then(() => {
+                if (lyricInflight.get(key) === request) lyricInflight.delete(key);
+            }, () => {
+                if (lyricInflight.get(key) === request) lyricInflight.delete(key);
+            });
         }
         try {
-            const value = await request;
+            const value = await waitForConsumer(request, signal);
             return { ...value, lines: Array.isArray(value.lines) ? value.lines.map(line => ({ ...line })) : [] };
         } catch (error) {
             if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') throw error;
@@ -56,7 +92,11 @@ class LyricService {
         return mergeTranslation(original, translation, toleranceMs);
     }
     findLineIndex(lines, timeMs) { return findLineIndex(lines, timeMs); }
-    clearMemoryCache() { lyricCache.clear(); lyricInflight.clear(); }
+    clearMemoryCache() {
+        lyricCacheGeneration += 1;
+        lyricCache.clear();
+        lyricInflight.clear();
+    }
 }
 
 export { LyricService, parseLrc, mergeTranslation, findLineIndex, normalizeLyrics };

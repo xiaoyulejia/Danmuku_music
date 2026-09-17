@@ -44,7 +44,7 @@ http://localhost:8000/order/launcher.html
 
 控制页的“队列管理”中可以使用“网易云点歌”搜索歌曲，选择结果后直接加入待播队列；服务端仍会执行队列上限、时长、黑名单和重复歌曲校验。
 
-版本配置统一写在 `config/version.js`：`productVersion` 是产品版本（例如 `DEV 0.1.6`），`buildId` 是前后端构建号。修改后重启服务即可同步到启动页、关于页和版本校验。
+版本配置统一写在 `config/version.js`：`productVersion` 是产品版本（当前为 `DEV 0.1.6_fix2`），`buildId` 是前后端构建号。修改后重启服务即可同步到启动页、关于页和版本校验。
 
 | 链接 | 用途 |
 | --- | --- |
@@ -134,13 +134,13 @@ http://127.0.0.1:8000/order/?roomid=4646297&source=obs
 # 实时 WebSocket 弹幕和调试
 http://127.0.0.1:8000/order/?roomid=4646297&source=obs&realtime=1&debug=1
 
-# 控制页
+# 控制页（也处理弹幕点歌）
 http://127.0.0.1:8000/order/?roomid=4646297&livemode=false&source=control
 
-# 控制页只读观察历史弹幕轮询，不重复触发点歌
+# 控制页调试历史弹幕轮询，同时允许点歌
 http://127.0.0.1:8000/order/?roomid=4646297&livemode=false&source=control&debug=1
 
-# 控制页只读观察实时弹幕，不重复触发点歌
+# 控制页调试实时弹幕，同时允许点歌
 http://127.0.0.1:8000/order/?roomid=4646297&livemode=false&source=control&realtime=1&debug=1
 
 # 透明歌词页

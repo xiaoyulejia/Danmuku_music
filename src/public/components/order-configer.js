@@ -1,4 +1,4 @@
-import publicMethod from "../utils/common.js?v=20260810-41";
+import publicMethod from "../utils/common.js?v=20260917-1";
 
 function isMirrorPage() {
     const query = window.location.search.replace(/^\?/, '').replace(/\?/g, '&');

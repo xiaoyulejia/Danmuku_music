@@ -1,6 +1,6 @@
-import musicPlayer from "./music-player.js?v=20260812-23";
-import publicMethod from "../utils/common.js?v=20260810-41";
-import musicServer from "../services/musicServers/music-server.js?v=20260812-22";
+import musicPlayer from "./music-player.js?v=20260917-1";
+import publicMethod from "../utils/common.js?v=20260917-1";
+import musicServer from "../services/musicServers/music-server.js?v=20260917-1";
 
 /**
  * 登录配置
@@ -25,6 +25,8 @@ class LoginConfiger {
     activeSongListSwitchSequence = 0;
     lastSongListRequestStamp = 0;
     songListStatusTimer = null;
+    qrCheckTimer = null;
+    qrRequestVersion = 0;
 
     constructor() {
         // 加载历史歌单列表
@@ -36,13 +38,10 @@ class LoginConfiger {
         // 让真正播放的 OBS 页面也能加载歌单和歌曲链接。
         if (musicPlayer.isMirrorMode) {
             musicPlayer.pushSharedCredentials();
-            // 控制页不能依赖 OBS 是否在线来结束“检查中”。有本地 Cookie
-            // 就检查本地登录态，没有就明确显示未登录；共享状态随后再覆盖为 OBS 的结果。
-            if (musicServer.getServer('wy').cookie) {
-                this.refreshNeteaseLoginStatus({ silent: true, publish: false });
-            } else {
-                this.setNeteaseLoginStatus({ state: 'logged-out', text: '未登录' }, false);
-            }
+            // 等待共享凭据同步完成后再检查，避免镜像页因异步拉取尚未结束而误报未登录。
+            Promise.resolve(musicPlayer.ready)
+                .then(() => this.refreshNeteaseLoginStatus({ silent: true, publish: false }))
+                .catch(() => this.setNeteaseLoginStatus({ state: 'error', text: '检查失败' }, false));
         }
         window.addEventListener('bilibili-ordersong-shared-settings', event => {
             this.applySharedState(event.detail?.login);
@@ -161,11 +160,6 @@ class LoginConfiger {
     async refreshNeteaseLoginStatus({ silent = false, publish = true } = {}) {
         this.setNeteaseLoginStatus({ state: 'checking', text: '检查中...' }, false);
         const server = musicServer.getServer('wy');
-        if (!server.cookie) {
-            this.setNeteaseLoginStatus({ state: 'logged-out', text: '未登录' }, publish);
-            return false;
-        }
-
         const result = await server.getLoginStatus();
         if (result?.loggedIn) {
             const nickname = result.nickname || result.profile?.nickname || '';
@@ -197,43 +191,77 @@ class LoginConfiger {
 
     // 扫码登录，更新二维码
     async updateQrPicture() {
-        // 二维码图片
-        let qrImg = document.getElementById('qrImg');
-        // 先获取二维码的key
-        let unikey = await musicServer.getServer("wy").getQrKey();
-        if (!unikey) {
-            qrImg.textContent = "二维码获取失败！";
-            return;
-        }
+        const qrImg = document.getElementById('qrImg');
+        const qrStatus = document.getElementById('qrStatus');
+        if (this.qrCheckTimer) clearTimeout(this.qrCheckTimer);
+        this.qrCheckTimer = null;
+        const requestVersion = ++this.qrRequestVersion;
+        const isCurrent = () => requestVersion === this.qrRequestVersion;
+        const setQrStatus = (text, state = 'checking') => {
+            if (!isCurrent() || !qrStatus) return;
+            qrStatus.textContent = text;
+            qrStatus.dataset.state = state;
+        };
+        const finish = (text, state = 'error', alertText = '') => {
+            if (!isCurrent()) return;
+            if (this.qrCheckTimer) clearTimeout(this.qrCheckTimer);
+            this.qrCheckTimer = null;
+            setQrStatus(text, state);
+            if (alertText) publicMethod.pageAlert(alertText);
+        };
 
-        // 用二维码key获取二维码图片地址
-        let qrUrl = await musicServer.getServer("wy").getQrPicture(unikey);
-
-        // 显示二维码/设置不可点击刷新
-        qrImg.setAttribute("src", qrUrl);
-
-        // 轮询二维码状态
-        let qrCheck = setInterval(async () => {
-            let data = await musicServer.getServer("wy").checkQrStatus(unikey);
-            if (!data) {
-                // 二维码失效
-                clearInterval(qrCheck);
-                publicMethod.pageAlert("二维码获取失败!");
-            } else if (data.code == 800) {
-                // 二维码过期
-                clearInterval(qrCheck);
-                publicMethod.pageAlert("二维码已过期");
-            } else if (data.code == 803) {
-                // 授权成功, 保存cookie
-                musicServer.getServer("wy").cookie = data.cookie;
-                localStorage.setItem("wycookie", typeof data.cookie === 'string' ? data.cookie : JSON.stringify(data.cookie));
-                qrImg.setAttribute("src", "");
-                clearInterval(qrCheck);
-                await musicPlayer.pushSharedCredentials();
-                await this.refreshNeteaseLoginStatus({ silent: true });
-                publicMethod.pageAlert("登录成功!");
+        setQrStatus('正在获取二维码…');
+        try {
+            const server = musicServer.getServer('wy');
+            const unikey = await server.getQrKey();
+            if (!isCurrent()) return;
+            if (!unikey) {
+                finish('二维码获取失败', 'error', '二维码获取失败!');
+                return;
             }
-        }, 3000)
+
+            const qrUrl = await server.getQrPicture(unikey);
+            if (!isCurrent()) return;
+            if (!qrUrl) {
+                finish('二维码获取失败', 'error', '二维码获取失败!');
+                return;
+            }
+            qrImg?.setAttribute('src', qrUrl);
+            setQrStatus('请使用网易云音乐 App 扫码');
+
+            const poll = async () => {
+                if (!isCurrent()) return;
+                try {
+                    const data = await server.checkQrStatus(unikey);
+                    if (!isCurrent()) return;
+                    if (!data) {
+                        finish('二维码获取失败', 'error', '二维码获取失败!');
+                    } else if (data.code == 800) {
+                        finish('二维码已过期', 'error', '二维码已过期');
+                    } else if (data.code == 803) {
+                        server.cookie = data.cookie;
+                        localStorage.setItem('wycookie', typeof data.cookie === 'string' ? data.cookie : JSON.stringify(data.cookie));
+                        qrImg?.setAttribute('src', '');
+                        this.qrCheckTimer = null;
+                        await musicPlayer.pushSharedCredentials();
+                        await this.refreshNeteaseLoginStatus({ silent: true });
+                        if (isCurrent()) {
+                            setQrStatus('登录成功', 'logged-in');
+                            publicMethod.pageAlert('登录成功!');
+                        }
+                    } else {
+                        this.qrCheckTimer = setTimeout(poll, 3000);
+                    }
+                } catch (error) {
+                    finish('二维码状态检查失败', 'error', '二维码状态检查失败!');
+                    console.error('二维码状态检查失败', error);
+                }
+            };
+            this.qrCheckTimer = setTimeout(poll, 3000);
+        } catch (error) {
+            finish('二维码获取失败', 'error', '二维码获取失败!');
+            console.error('二维码获取失败', error);
+        }
     }
 
     // cookie登录，设置cookie

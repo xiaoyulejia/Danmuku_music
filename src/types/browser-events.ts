@@ -1,8 +1,7 @@
-import type { RoomState, SyncCommand } from './sync.js';
+import type { RoomState } from './sync.js';
 
 export interface BrowserEventDetailMap {
-  'damuku:room-state': { roomId: string; state: RoomState };
-  'damuku:sync-command': { roomId: string; command: SyncCommand };
+  'damuku-room-state': RoomState;
 }
 
 declare global {
@@ -17,9 +16,8 @@ declare global {
     __DAMUKU_FRONTEND_BUILD_ID?: string;
   }
 
-  interface DocumentEventMap {
-    'damuku:room-state': CustomEvent<BrowserEventDetailMap['damuku:room-state']>;
-    'damuku:sync-command': CustomEvent<BrowserEventDetailMap['damuku:sync-command']>;
+  interface WindowEventMap {
+    'damuku-room-state': CustomEvent<BrowserEventDetailMap['damuku-room-state']>;
   }
 }
 

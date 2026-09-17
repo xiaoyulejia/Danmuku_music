@@ -1,7 +1,11 @@
-netstat -ano | findstr :8000
-taskkill /IM node.exe /F
-tasklist | findstr node.exe
+# Windows 排障脚本
 
+不要使用按镜像名结束进程或硬编码 PID 的命令；它们可能终止其他 Node 项目，而且 PID 很快会失效。
 
-taskkill /PID 43660 /F
-taskkill /PID 27008 /F
+请在项目根目录运行正式的清理脚本：
+
+```bat
+清理点歌台进程.bat
+```
+
+该脚本会读取端口和项目基础路径，只停止本项目的 `app.js`/`scripts\launch.js` 进程，并提供保留或清理运行缓存的选项。

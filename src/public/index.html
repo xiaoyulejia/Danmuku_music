@@ -7,20 +7,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Damuku_music</title>
     <!-- DEV/STA 产品版本与前端构建号由 config/version.js 生成到 version.js。 -->
-    <script src="./version.js?v=20260902-3"></script>
+    <script src="./version.js?v=20260917-1"></script>
     <!-- 库文件 -->
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/pako/2.0.3/pako.min.js"></script>
     <!-- 配置文件 -->
     <script src="./webapi.js"></script>
     <!-- main -->
-    <script type="module" src="./main.js?v=20260831-7"></script>
+    <script type="module" src="./main.js?v=20260917-1"></script>
     <!-- 总体样式文件 -->
-    <link rel="stylesheet" href="./styles/main-page.css?v=20260831-7">
+    <link rel="stylesheet" href="./styles/main-page.css?v=20260917-1">
     <!-- 点歌面板样式 -->
-    <link rel="stylesheet" href="./styles/order-table.css?v=20260809-16">
+    <link rel="stylesheet" href="./styles/order-table.css?v=20260917-1">
     <!-- 设置面板样式 -->
-    <link rel="stylesheet" href="./styles/setting-page.css?v=20260902-3">
+    <link rel="stylesheet" href="./styles/setting-page.css?v=20260917-1">
     <style id="customOverlayStyle"></style>
 </head>
 
@@ -169,8 +168,9 @@
                                     <div id="loginForm">
                                         <!-- 网易云扫码登录 -->
                                         <div class="qr_login">
-                                            <img id="qrImg">
+                                            <img id="qrImg" alt="网易云登录二维码">
                                             <button id="qrButton">刷新二维码</button>
+                                            <span id="qrStatus" class="loginStatus" data-state="checking" role="status" aria-live="polite">点击“刷新二维码”获取二维码</span>
                                         </div>
                                         <!-- QQ音乐cookie登录 -->
                                         <div class="ck_login">

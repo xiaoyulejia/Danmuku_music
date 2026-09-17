@@ -1,7 +1,7 @@
-import musicPlayer from "./music-player.js?v=20260812-23";
-import publicMethod from "../utils/common.js?v=20260810-41";
-import musicServer from "../services/musicServers/music-server.js?v=20260812-22";
-import danmuServer from "../services/danmuServers/danmu-server.js?v=20260813-1";
+import musicPlayer from "./music-player.js?v=20260917-1";
+import publicMethod from "../utils/common.js?v=20260917-1";
+import musicServer from "../services/musicServers/music-server.js?v=20260917-1";
+import danmuServer from "../services/danmuServers/danmu-server.js?v=20260917-1";
 
 /* 在此处启动弹幕服务 */
 class DanmuConfiger {
@@ -53,19 +53,41 @@ class DanmuConfiger {
         @param: userDanmu 包括用户id、用户名、用户弹幕
     */
     async identifyDanmuCommand(userDanmu) {
-        let danmuMsg = userDanmu.danmu.trim();
+        let danmuMsg = String(userDanmu?.danmu || '').trim();
+        const eventId = String(
+            userDanmu?.messageId ||
+            userDanmu?.fingerprint ||
+            [userDanmu?.uid, userDanmu?.sentAt, userDanmu?.danmu].join('|')
+        ).trim();
+        const commandId = command => eventId
+            ? `danmu:${userDanmu?.roomId || window.location.search}:${command}:${eventId}`
+            : '';
 
         // 点歌命令触发
         if (danmuMsg.slice(0, 2) == "点歌") {
             let keyword = danmuMsg.slice(2).trim();
-            let platform = keyword.slice(0, 2);
+            let platform = keyword.slice(0, 2).toLowerCase();
             if (musicServer.platformList.includes(platform)) {
                 // 如果存在平台信息，关键字剔除平台信息
-                keyword = danmuMsg.slice(4).trim();
+                keyword = keyword.slice(2).replace(/^[：:,，\s]+/, '').trim();
+            } else {
+                keyword = keyword.replace(/^[：:,，\s]+/, '').trim();
             }
 
             // 根据平台通过API查询歌曲信息
-            let song = await musicServer.getServer(platform).getSongInfo(keyword);
+            const server = musicServer.getServer(platform);
+            if (!server || !keyword) {
+                publicMethod.pageAlert("没找到<(▰˘◡˘▰)>");
+                return;
+            }
+            let song;
+            try {
+                song = await server.getSongInfo(keyword);
+            } catch (error) {
+                console.error('[BilibiliDanmu] 点歌搜索失败', error);
+                publicMethod.pageAlert("歌曲搜索失败，请稍后再试");
+                return;
+            }
             if (!song) {
                 publicMethod.pageAlert("没找到<(▰˘◡˘▰)>");
                 return;
@@ -78,7 +100,14 @@ class DanmuConfiger {
             }
 
             // 添加点歌信息到点歌列表  
-            await musicPlayer.addOrder(order);
+            try {
+                await musicPlayer.addOrder(order, {
+                    commandId: commandId('addOrder')
+                });
+            } catch (error) {
+                console.error('[BilibiliDanmu] 点歌提交失败', error);
+                publicMethod.pageAlert("点歌提交失败，请稍后再试");
+            }
 
             // 点歌只提交给后端，当前歌曲、队列位置和是否立即播放由后端统一决定。
 
@@ -98,19 +127,19 @@ class DanmuConfiger {
 
             if (isOwner || isAdmin || isFree) {
                 // 如果当前播放的是空闲歌单、用户歌曲，或者发送命令的是管理员，则播放下一首歌曲
-                musicPlayer.requestNext();
+                musicPlayer.requestNext(null, { commandId: commandId('next') });
             } else {
                 publicMethod.pageAlert("不能切别人点的歌哦(^o^)");
             }
         } else if (danmuMsg == "暂停") {
             if (userDanmu.uid == this.adminId) {
-                musicPlayer.pausePlayback();
+                musicPlayer.pausePlayback({ commandId: commandId('pause') });
             } else {
                 publicMethod.pageAlert("您没有改权限进行该操作~");
             }
         } else if (danmuMsg == "播放") {
             if (userDanmu.uid == this.adminId) {
-                musicPlayer.unlockPlayback();
+                musicPlayer.unlockPlayback({ commandId: commandId('unlockAudio') });
             } else {
                 publicMethod.pageAlert("您没有改权限进行该操作~");
             }

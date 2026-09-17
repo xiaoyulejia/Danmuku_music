@@ -47,15 +47,44 @@ test('prints an explicit WebSocket realtime danmu log only in debug mode', () =>
     assert.ok(realtimeLog > debugGuard && callback > realtimeLog);
 });
 
-test('allows debug observation on mirror pages without processing commands', () => {
+test('allows mirror pages to process commands independently of debug logging', () => {
     const mainSource = fs.readFileSync(path.join(__dirname, '../src/public/main.js'), 'utf8');
     const configSource = fs.readFileSync(
         path.join(__dirname, '../src/public/components/danmu-configer.js'),
         'utf8'
     );
-    assert.match(mainSource, /debugObserver/);
-    assert.match(mainSource, /startDanmu\(\{ processCommands: false \}\)/);
+    assert.match(mainSource, /mirrorDanmuMode/);
+    assert.match(mainSource, /startDanmu\(\{ processCommands: true \}\)/);
     assert.match(configSource, /processCommands\s*\?\s*this\.identifyDanmuCommand\.bind\(this\)\s*:\s*null/);
+});
+
+test('history danmu keeps stable identity and point-song uses the commandId helper', () => {
+    const serverSource = fs.readFileSync(
+        path.join(__dirname, '../src/public/services/danmuServers/bilibili-server.js'),
+        'utf8'
+    );
+    const configSource = fs.readFileSync(
+        path.join(__dirname, '../src/public/components/danmu-configer.js'),
+        'utf8'
+    );
+    assert.match(serverSource, /messageId:\s*item\.id_str\s*\|\|\s*item\.id/);
+    assert.match(serverSource, /sentAt:\s*Number\.isFinite\(sentAt\)/);
+    assert.match(serverSource, /fingerprint,/);
+    assert.match(configSource, /const commandId = command => eventId/);
+    assert.match(configSource, /commandId:\s*commandId\('addOrder'\)/);
+    assert.doesNotMatch(configSource, /commandId:\s*command\('addOrder'\)/);
+});
+
+test('launcher defaults to realtime mode and propagates the selected mode to generated links', () => {
+    const launcherSource = fs.readFileSync(path.join(__dirname, '../src/public/launcher.html'), 'utf8');
+    assert.match(launcherSource, /<option value="realtime" selected>实时 WebSocket（默认）<\/option>/);
+    assert.match(launcherSource, /<option value="history">历史 10 条轮询<\/option>/);
+    assert.match(launcherSource, /function selectedModeQuery\(\)/);
+    assert.match(launcherSource, /\? \{ history: '1' \}/);
+    assert.match(launcherSource, /: \{ realtime: '1' \}/);
+    assert.match(launcherSource, /source: 'obs', \.\.\.modeQuery/);
+    assert.match(launcherSource, /source: 'control', \.\.\.modeQuery/);
+    assert.match(launcherSource, /settingsUrlObject\.search = new URLSearchParams\(\{ roomid: roomId, \.\.\.modeQuery \}\)/);
 });
 
 function protocolPacket(body, operation = 5, version = 1, sequence = 1) {
